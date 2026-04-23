@@ -20,10 +20,16 @@ local GymUse    = ReplicatedStorage:WaitForChild("Action"):WaitForChild("GymUse"
 local Camera    = Workspace.CurrentCamera
 local SCRIPT_URL = ""
 
+-- =============================================
+--// FILE HELPERS \\--
+-- =============================================
 local function ensureFolder(path)
     pcall(function() if not isfolder(path) then makefolder(path) end end)
 end
 
+-- =============================================
+--// SESSION TIMER \\--
+-- =============================================
 local SessionStart = os.clock()
 local function getSessionTime()
     local elapsed = math.floor(os.clock() - SessionStart)
@@ -35,7 +41,7 @@ local function getSessionTime()
 end
 
 -- =============================================
---// THEMES
+--// THEME SYSTEM \\--
 -- =============================================
 local Themes = {
     ["Rebellion Dark"] = { BG=Color3.fromRGB(9,11,16),    Sidebar=Color3.fromRGB(14,17,25),  Panel=Color3.fromRGB(18,22,32),  Card=Color3.fromRGB(22,27,40),  Stroke=Color3.fromRGB(32,38,56),  Accent=Color3.fromRGB(82,130,255),  AccentDk=Color3.fromRGB(55,100,220),  Text=Color3.fromRGB(215,225,245), Muted=Color3.fromRGB(75,90,125),  SidebarAlpha=0,    BgAlpha=0 },
@@ -54,84 +60,82 @@ local Themes = {
     ["Deuteranopia"]   = { BG=Color3.fromRGB(10,12,20),   Sidebar=Color3.fromRGB(15,18,30),  Panel=Color3.fromRGB(20,24,38),  Card=Color3.fromRGB(24,28,44),  Stroke=Color3.fromRGB(38,45,65),  Accent=Color3.fromRGB(60,160,255),  AccentDk=Color3.fromRGB(30,130,230),  Text=Color3.fromRGB(220,230,245), Muted=Color3.fromRGB(100,120,160),SidebarAlpha=0,    BgAlpha=0 },
     ["Tritanopia"]     = { BG=Color3.fromRGB(10,12,14),   Sidebar=Color3.fromRGB(15,18,20),  Panel=Color3.fromRGB(20,24,26),  Card=Color3.fromRGB(24,28,32),  Stroke=Color3.fromRGB(38,46,52),  Accent=Color3.fromRGB(255,100,160), AccentDk=Color3.fromRGB(220,70,130),  Text=Color3.fromRGB(235,235,240), Muted=Color3.fromRGB(120,130,140),SidebarAlpha=0,    BgAlpha=0 },
 }
-local LowContrastThemes = {["Ghost"]=true,["Ash"]=true,["Tritanopia"]=true}
+
+-- Poor-contrast theme list (accent too close to bg luminance)
+local LowContrastThemes = {["Ghost"]=true, ["Ash"]=true, ["Tritanopia"]=true}
+
 local CurrentThemeName = "Rebellion Dark"
 local T = Themes[CurrentThemeName]
-
--- Store theme colors in a table to avoid burning locals
-local TC = {}
+local C_BG, C_SIDEBAR, C_PANEL, C_CARD, C_STROKE, C_ACCENT, C_ACCENT_DK, C_TEXT, C_MUTED
 local C_GREEN  = Color3.fromRGB(34,197,94)
 local C_RED    = Color3.fromRGB(239,68,68)
 local C_YELLOW = Color3.fromRGB(234,179,8)
 
 local function applyTheme(name)
     local th = Themes[name]; if not th then return end
-    CurrentThemeName = name; T = th
-    TC.BG       = th.BG;     TC.SIDEBAR  = th.Sidebar; TC.PANEL    = th.Panel
-    TC.CARD     = th.Card;   TC.STROKE   = th.Stroke;  TC.ACCENT   = th.Accent
-    TC.ACCENTDK = th.AccentDk; TC.TEXT   = th.Text;    TC.MUTED    = th.Muted
+    CurrentThemeName=name; T=th
+    C_BG=th.BG; C_SIDEBAR=th.Sidebar; C_PANEL=th.Panel; C_CARD=th.Card
+    C_STROKE=th.Stroke; C_ACCENT=th.Accent; C_ACCENT_DK=th.AccentDk
+    C_TEXT=th.Text; C_MUTED=th.Muted
 end
 applyTheme(CurrentThemeName)
 
--- Convenience aliases (these are the only "C_" locals we keep at top scope)
-local function C_BG()       return TC.BG       end
-local function C_SIDEBAR()  return TC.SIDEBAR  end
-local function C_PANEL()    return TC.PANEL    end
-local function C_CARD()     return TC.CARD     end
-local function C_STROKE()   return TC.STROKE   end
-local function C_ACCENT()   return TC.ACCENT   end
-local function C_ACCENT_DK()return TC.ACCENTDK end
-local function C_TEXT()     return TC.TEXT     end
-local function C_MUTED()    return TC.MUTED    end
-
 -- =============================================
---// SETTINGS TABLES  (one local each)
+--// UI SETTINGS \\--
 -- =============================================
 local UISettings = {
-    FontScale=1.0, CompactSidebar=false, DimOverlay=false,
-    ShowOnboarding=true, ConfirmDialogs=true,
-    ToastPosition="BottomRight", FontSizeMode="Medium",
+    FontScale      = 1.0,
+    CompactSidebar = false,
+    DimOverlay     = false,
+    ShowOnboarding = true,
+    ConfirmDialogs = true,
+    ToastPosition  = "BottomRight", -- "TopRight","BottomRight","BottomLeft"
+    FontSizeMode   = "Medium",      -- "Small","Medium","Large"
 }
+
+-- =============================================
+--// FEATURE STATE TABLES \\--
+-- =============================================
 local ClashSettings = {
-    AutoClash=false, HighlightOnSelect=true,
-    ClashKeybind=Enum.KeyCode.F, HasAttention=false,
+    AutoClash=false, HighlightOnSelect=true, ClashKeybind=Enum.KeyCode.F,
+    HasAttention=false,
 }
 local CameraSettings = {
     BrokenCamera=false, FrozenCFrame=nil, RenderConnection=nil,
     LockOnKeybind=Enum.KeyCode.T, CurrentlyFrozen=false, SubjectConnection=nil,
 }
-local AntiAFK        = { Enabled=false }
+local AntiAFK      = { Enabled=false }
 local NoclipSettings = { Enabled=false, Connection=nil }
-local AutoRejoin     = { Enabled=false, Delay=5, Method="SameServer", Connection=nil, LoadScript=true }
-local AutoReconnect  = { Enabled=false, Delay=4, CoreGuiConnection=nil, NetworkConnection=nil, KickConnection=nil }
-local RayfieldKeybind= { Key=Enum.KeyCode.RightShift }
-local ProfileSettings= { Current="Default", Names={"Default","Farm Mode","PvP Mode","Custom 1","Custom 2"} }
+local AutoRejoin   = { Enabled=false, Delay=5, Method="SameServer", Connection=nil, LoadScript=true }
+local AutoReconnect = { Enabled=false, Delay=4, CoreGuiConnection=nil, NetworkConnection=nil, KickConnection=nil }
+local RayfieldKeybindSettings = { Key=Enum.KeyCode.RightShift }
+local ProfileSettings = { Current="Default", Names={"Default","Farm Mode","PvP Mode","Custom 1","Custom 2"} }
 local PROFILE_FOLDER = "ZebraBoxingLeague/Profiles"
-
-local FlyEnabled         = false
-local dexGrindActive     = false
-local dexSelectedBox     = "BOX1"
-local dexCurrentVal      = 0
-local dexGoalVal         = 0
-local BagHighlightEnabled= true
+local FlyEnabled = false
+local dexGrindActive = false
+local dexSelectedBox = "BOX1"
+local dexCurrentVal = 0
+local dexGoalVal = 0
+local BagHighlightEnabled = true
 local BagHighlightInstances = {}
-local KeybindCheatsheetKey  = Enum.KeyCode.K
+local KeybindCheatsheetKey = Enum.KeyCode.K
 
+-- Active feature count
 local function getActiveCount()
-    local n = 0
-    if dexGrindActive           then n=n+1 end
-    if ClashSettings.AutoClash  then n=n+1 end
-    if AntiAFK.Enabled          then n=n+1 end
-    if NoclipSettings.Enabled   then n=n+1 end
-    if AutoRejoin.Enabled       then n=n+1 end
-    if AutoReconnect.Enabled    then n=n+1 end
+    local n=0
+    if dexGrindActive then n=n+1 end
+    if ClashSettings.AutoClash then n=n+1 end
+    if AntiAFK.Enabled then n=n+1 end
+    if NoclipSettings.Enabled then n=n+1 end
+    if AutoRejoin.Enabled then n=n+1 end
+    if AutoReconnect.Enabled then n=n+1 end
     if CameraSettings.BrokenCamera then n=n+1 end
-    if FlyEnabled               then n=n+1 end
+    if FlyEnabled then n=n+1 end
     return n
 end
 
 -- =============================================
---// FAVORITES
+--// FAVORITES \\--
 -- =============================================
 local Favorites = {}
 local function isFavorite(key) return Favorites[key]==true end
@@ -149,12 +153,18 @@ pcall(function()
     end
 end)
 
+-- =============================================
+--// RECENT ACTIONS LOG \\--
+-- =============================================
 local RecentActions = {}
 local function logAction(label)
     table.insert(RecentActions,1,{label=label,timestamp=getSessionTime()})
     if #RecentActions>50 then table.remove(RecentActions) end
 end
 
+-- =============================================
+--// NOTIFICATION HISTORY \\--
+-- =============================================
 local NotifHistory = {}
 local function addToNotifHistory(title,content,color)
     table.insert(NotifHistory,1,{title=title,content=content,color=color,timestamp=getSessionTime()})
@@ -162,52 +172,63 @@ local function addToNotifHistory(title,content,color)
 end
 
 -- =============================================
---// CONFIG SERIALIZATION
+--// CONFIG EXPORT / IMPORT \\--
 -- =============================================
 local function serializeConfig()
     local cfg = {
-        Theme=CurrentThemeName, FontSizeMode=UISettings.FontSizeMode,
-        CompactSidebar=UISettings.CompactSidebar, DimOverlay=UISettings.DimOverlay,
-        ConfirmDialogs=UISettings.ConfirmDialogs, ToastPosition=UISettings.ToastPosition,
-        RejoinDelay=AutoRejoin.Delay, RejoinMethod=AutoRejoin.Method, RejoinLoad=AutoRejoin.LoadScript,
-        ReconnectDelay=AutoReconnect.Delay, ClashKeybind=ClashSettings.ClashKeybind.Name,
-        CameraKeybind=CameraSettings.LockOnKeybind.Name, UIKeybind=RayfieldKeybind.Key.Name,
-        CheatsheetKey=KeybindCheatsheetKey.Name, Favorites=Favorites,
-        DexBox=dexSelectedBox, BagHighlight=BagHighlightEnabled,
+        Theme           = CurrentThemeName,
+        FontSizeMode    = UISettings.FontSizeMode,
+        CompactSidebar  = UISettings.CompactSidebar,
+        DimOverlay      = UISettings.DimOverlay,
+        ConfirmDialogs  = UISettings.ConfirmDialogs,
+        ToastPosition   = UISettings.ToastPosition,
+        RejoinDelay     = AutoRejoin.Delay,
+        RejoinMethod    = AutoRejoin.Method,
+        RejoinLoad      = AutoRejoin.LoadScript,
+        ReconnectDelay  = AutoReconnect.Delay,
+        ClashKeybind    = ClashSettings.ClashKeybind.Name,
+        CameraKeybind   = CameraSettings.LockOnKeybind.Name,
+        UIKeybind       = RayfieldKeybindSettings.Key.Name,
+        CheatsheetKey   = KeybindCheatsheetKey.Name,
+        Favorites       = Favorites,
+        DexBox          = dexSelectedBox,
+        BagHighlight    = BagHighlightEnabled,
     }
     return HttpService:JSONEncode(cfg)
 end
+
 local function deserializeConfig(str)
     local ok, cfg = pcall(function() return HttpService:JSONDecode(str) end)
     if not ok or type(cfg)~="table" then return false end
     pcall(function()
         if cfg.Theme and Themes[cfg.Theme] then applyTheme(cfg.Theme) end
-        if cfg.FontSizeMode    then UISettings.FontSizeMode    = cfg.FontSizeMode end
-        if cfg.CompactSidebar~=nil then UISettings.CompactSidebar = cfg.CompactSidebar end
-        if cfg.DimOverlay~=nil then UISettings.DimOverlay      = cfg.DimOverlay end
-        if cfg.ConfirmDialogs~=nil then UISettings.ConfirmDialogs = cfg.ConfirmDialogs end
-        if cfg.ToastPosition   then UISettings.ToastPosition   = cfg.ToastPosition end
-        if cfg.RejoinDelay     then AutoRejoin.Delay            = cfg.RejoinDelay end
-        if cfg.RejoinMethod    then AutoRejoin.Method           = cfg.RejoinMethod end
-        if cfg.RejoinLoad~=nil then AutoRejoin.LoadScript       = cfg.RejoinLoad end
-        if cfg.ReconnectDelay  then AutoReconnect.Delay         = cfg.ReconnectDelay end
-        if cfg.ClashKeybind    then pcall(function() ClashSettings.ClashKeybind   = Enum.KeyCode[cfg.ClashKeybind]   end) end
-        if cfg.CameraKeybind   then pcall(function() CameraSettings.LockOnKeybind = Enum.KeyCode[cfg.CameraKeybind]  end) end
-        if cfg.UIKeybind       then pcall(function() RayfieldKeybind.Key           = Enum.KeyCode[cfg.UIKeybind]      end) end
-        if cfg.CheatsheetKey   then pcall(function() KeybindCheatsheetKey          = Enum.KeyCode[cfg.CheatsheetKey]  end) end
+        if cfg.FontSizeMode then UISettings.FontSizeMode=cfg.FontSizeMode end
+        if cfg.CompactSidebar~=nil then UISettings.CompactSidebar=cfg.CompactSidebar end
+        if cfg.DimOverlay~=nil then UISettings.DimOverlay=cfg.DimOverlay end
+        if cfg.ConfirmDialogs~=nil then UISettings.ConfirmDialogs=cfg.ConfirmDialogs end
+        if cfg.ToastPosition then UISettings.ToastPosition=cfg.ToastPosition end
+        if cfg.RejoinDelay then AutoRejoin.Delay=cfg.RejoinDelay end
+        if cfg.RejoinMethod then AutoRejoin.Method=cfg.RejoinMethod end
+        if cfg.RejoinLoad~=nil then AutoRejoin.LoadScript=cfg.RejoinLoad end
+        if cfg.ReconnectDelay then AutoReconnect.Delay=cfg.ReconnectDelay end
+        if cfg.ClashKeybind then pcall(function() ClashSettings.ClashKeybind=Enum.KeyCode[cfg.ClashKeybind] end) end
+        if cfg.CameraKeybind then pcall(function() CameraSettings.LockOnKeybind=Enum.KeyCode[cfg.CameraKeybind] end) end
+        if cfg.UIKeybind then pcall(function() RayfieldKeybindSettings.Key=Enum.KeyCode[cfg.UIKeybind] end) end
+        if cfg.CheatsheetKey then pcall(function() KeybindCheatsheetKey=Enum.KeyCode[cfg.CheatsheetKey] end) end
         if cfg.Favorites and type(cfg.Favorites)=="table" then Favorites=cfg.Favorites end
-        if cfg.DexBox          then dexSelectedBox    = cfg.DexBox end
-        if cfg.BagHighlight~=nil then BagHighlightEnabled = cfg.BagHighlight end
+        if cfg.DexBox then dexSelectedBox=cfg.DexBox end
+        if cfg.BagHighlight~=nil then BagHighlightEnabled=cfg.BagHighlight end
     end)
     return true
 end
 
 -- =============================================
---// MACRO RECORDER
+--// MACRO RECORDER \\--
 -- =============================================
-local MacroRecorder = { Recording=false, Playing=false, Macros={}, CurrentRec=nil }
-local lastInputTime  = 0
-
+local MacroRecorder = {
+    Recording=false, Playing=false,
+    Macros={}, CurrentRec=nil,
+}
 local function startMacroRecording(name)
     if MacroRecorder.Recording then return end
     MacroRecorder.Recording=true
@@ -231,45 +252,59 @@ local function playMacro(macro)
     if MacroRecorder.Playing then return end
     MacroRecorder.Playing=true
     task.spawn(function()
-        local startT = os.clock(); local cumulative = 0
-        for _, action in ipairs(macro.actions) do
+        -- FIX: use absolute timestamps relative to macro start
+        local startT = os.clock()
+        local events = macro.actions
+        -- Rebuild cumulative timestamps
+        local cumulative = 0
+        for idx, action in ipairs(events) do
             cumulative = cumulative + (action.delay or 0)
             local waitUntil = startT + cumulative
             local now = os.clock()
-            if waitUntil > now then task.wait(waitUntil - now) end
+            if waitUntil > now then
+                task.wait(waitUntil - now)
+            end
             if action.type=="key" then
                 pcall(function()
                     local kc = Enum.KeyCode[action.key]
-                    if kc then VIM:SendKeyEvent(true,kc,false,game); task.wait(0.05); VIM:SendKeyEvent(false,kc,false,game) end
+                    if kc then
+                        VIM:SendKeyEvent(true, kc, false, game)
+                        task.wait(0.05)
+                        VIM:SendKeyEvent(false, kc, false, game)
+                    end
                 end)
             elseif action.type=="click" then
                 pcall(function()
-                    VIM:SendMouseButtonEvent(action.x,action.y,0,true,game,1); task.wait(0.05)
-                    VIM:SendMouseButtonEvent(action.x,action.y,0,false,game,1)
+                    VIM:SendMouseButtonEvent(action.x, action.y, 0, true, game, 1)
+                    task.wait(0.05)
+                    VIM:SendMouseButtonEvent(action.x, action.y, 0, false, game, 1)
                 end)
             end
         end
-        MacroRecorder.Playing=false; logAction("Macro played: "..macro.name)
+        MacroRecorder.Playing=false
+        logAction("Macro played: "..macro.name)
     end)
 end
+-- FIX: Record with proper relative delays
+local lastInputTime = 0
 UIS.InputBegan:Connect(function(inp)
     if not MacroRecorder.Recording or not MacroRecorder.CurrentRec then return end
     if inp.UserInputType==Enum.UserInputType.Keyboard then
         local now = os.clock()
-        local delay = (lastInputTime==0) and 0 or (now-lastInputTime)
+        local delay = (lastInputTime == 0) and 0 or (now - lastInputTime)
         lastInputTime = now
-        table.insert(MacroRecorder.CurrentRec.actions,{type="key",key=inp.KeyCode.Name,delay=delay})
+        table.insert(MacroRecorder.CurrentRec.actions, {type="key", key=inp.KeyCode.Name, delay=delay})
     end
 end)
 pcall(function()
     if isfile("ZebraBoxingLeague/macros.json") then
-        local d = HttpService:JSONDecode(readfile("ZebraBoxingLeague/macros.json"))
+        local d=HttpService:JSONDecode(readfile("ZebraBoxingLeague/macros.json"))
         for _,m in ipairs(d) do table.insert(MacroRecorder.Macros,m) end
     end
 end)
 
 -- =============================================
---// PROFILES
+--// PROFILES \\--
 -- =============================================
 local function saveProfile(name)
     pcall(function()
@@ -288,17 +323,17 @@ local function loadProfile(name)
         local path=PROFILE_FOLDER.."/"..name..".json"
         if not isfile(path) then return end
         local data=HttpService:JSONDecode(readfile(path))
-        if data.RejoinDelay    then AutoRejoin.Delay       = data.RejoinDelay end
-        if data.RejoinMethod   then AutoRejoin.Method      = data.RejoinMethod end
-        if data.RejoinLoad~=nil then AutoRejoin.LoadScript  = data.RejoinLoad end
-        if data.FontSizeMode   then UISettings.FontSizeMode= data.FontSizeMode end
+        if data.RejoinDelay   then AutoRejoin.Delay=data.RejoinDelay end
+        if data.RejoinMethod  then AutoRejoin.Method=data.RejoinMethod end
+        if data.RejoinLoad~=nil then AutoRejoin.LoadScript=data.RejoinLoad end
+        if data.FontSizeMode  then UISettings.FontSizeMode=data.FontSizeMode end
         ok=true
     end)
     return ok
 end
 
 -- =============================================
---// WINDOW STATE
+--// WINDOW PERSISTENCE \\--
 -- =============================================
 local function saveWindowState(pos,size)
     pcall(function()
@@ -319,20 +354,29 @@ local function loadWindowState()
 end
 
 -- =============================================
---// UI HELPERS
+--// FONT SCALE HELPER \\--
 -- =============================================
 local function fs(size)
     local scale = 1.0
-    if UISettings.FontSizeMode=="Small"  then scale=0.85
-    elseif UISettings.FontSizeMode=="Large" then scale=1.2 end
-    return math.max(8, math.floor(size*scale))
+    if UISettings.FontSizeMode == "Small" then scale = 0.85
+    elseif UISettings.FontSizeMode == "Large" then scale = 1.2 end
+    return math.max(8, math.floor(size * scale))
 end
-local function makeRound(p,r)  local c=Instance.new("UICorner",p); c.CornerRadius=UDim.new(0,r or 6); return c end
-local function makeStroke(p,col,th) local s=Instance.new("UIStroke",p); s.Color=col or C_STROKE(); s.Thickness=th or 1; return s end
+
+-- =============================================
+--// UI HELPERS \\--
+-- =============================================
+local function makeRound(p,r)
+    local c=Instance.new("UICorner",p); c.CornerRadius=UDim.new(0,r or 6); return c
+end
+local function makeStroke(p,col,th)
+    local s=Instance.new("UIStroke",p); s.Color=col or C_STROKE; s.Thickness=th or 1; return s
+end
 local function makePadding(p,t,b,l,r)
     local pad=Instance.new("UIPadding",p)
     pad.PaddingTop=UDim.new(0,t or 0); pad.PaddingBottom=UDim.new(0,b or 0)
-    pad.PaddingLeft=UDim.new(0,l or 0); pad.PaddingRight=UDim.new(0,r or 0); return pad
+    pad.PaddingLeft=UDim.new(0,l or 0); pad.PaddingRight=UDim.new(0,r or 0)
+    return pad
 end
 local function makeList(p,dir,pad,sort)
     local l=Instance.new("UIListLayout",p)
@@ -342,7 +386,7 @@ local function makeList(p,dir,pad,sort)
 end
 
 -- =============================================
---// NOTIFICATION SYSTEM
+--// NOTIFICATION SYSTEM (FIXED + POSITION SUPPORT) \\--
 -- =============================================
 local NotifGui=Instance.new("ScreenGui")
 NotifGui.Name="BLNotifs"; NotifGui.ResetOnSpawn=false; NotifGui.DisplayOrder=1001
@@ -350,20 +394,25 @@ NotifGui.IgnoreGuiInset=true; NotifGui.ZIndexBehavior=Enum.ZIndexBehavior.Siblin
 NotifGui.Parent=playerGui
 
 local NotifStack=Instance.new("Frame",NotifGui)
-NotifStack.Size=UDim2.new(0,280,1,0); NotifStack.BackgroundTransparency=1; NotifStack.BorderSizePixel=0
-local nl=Instance.new("UIListLayout",NotifStack); nl.SortOrder=Enum.SortOrder.LayoutOrder
+NotifStack.Size=UDim2.new(0,280,1,0)
+NotifStack.BackgroundTransparency=1; NotifStack.BorderSizePixel=0
+local nl=Instance.new("UIListLayout",NotifStack)
+nl.SortOrder=Enum.SortOrder.LayoutOrder
 local np=Instance.new("UIPadding",NotifStack)
 
 local function applyToastPosition()
     local pos = UISettings.ToastPosition
-    if pos=="TopRight" then
-        NotifStack.Position=UDim2.new(1,-290,0,0); nl.VerticalAlignment=Enum.VerticalAlignment.Top
+    if pos == "TopRight" then
+        NotifStack.Position=UDim2.new(1,-290,0,0)
+        nl.VerticalAlignment=Enum.VerticalAlignment.Top
         np.PaddingTop=UDim.new(0,14); np.PaddingBottom=UDim.new(0,0)
-    elseif pos=="BottomLeft" then
-        NotifStack.Position=UDim2.new(0,10,0,0); nl.VerticalAlignment=Enum.VerticalAlignment.Bottom
+    elseif pos == "BottomLeft" then
+        NotifStack.Position=UDim2.new(0,10,0,0)
+        nl.VerticalAlignment=Enum.VerticalAlignment.Bottom
         np.PaddingTop=UDim.new(0,0); np.PaddingBottom=UDim.new(0,14)
-    else
-        NotifStack.Position=UDim2.new(1,-290,0,0); nl.VerticalAlignment=Enum.VerticalAlignment.Bottom
+    else -- BottomRight (default)
+        NotifStack.Position=UDim2.new(1,-290,0,0)
+        nl.VerticalAlignment=Enum.VerticalAlignment.Bottom
         np.PaddingTop=UDim.new(0,0); np.PaddingBottom=UDim.new(0,14)
     end
     nl.Padding=UDim.new(0,6)
@@ -372,20 +421,21 @@ applyToastPosition()
 
 local notifCount=0
 local function Notify(title,content,duration,color)
-    notifCount=notifCount+1; duration=duration or 3; color=color or C_ACCENT()
+    notifCount=notifCount+1; duration=duration or 3; color=color or C_ACCENT
     addToNotifHistory(title,content,color)
     local card=Instance.new("Frame",NotifStack)
-    card.Size=UDim2.new(1,0,0,60); card.BackgroundColor3=C_SIDEBAR()
+    card.Size=UDim2.new(1,0,0,60); card.BackgroundColor3=C_SIDEBAR
     card.BackgroundTransparency=0.08; card.BorderSizePixel=0; card.LayoutOrder=notifCount
-    makeRound(card,8); makeStroke(card,C_STROKE(),1)
+    makeRound(card,8); makeStroke(card,C_STROKE,1)
     local bar=Instance.new("Frame",card); bar.Size=UDim2.new(0,3,1,-14)
     bar.Position=UDim2.new(0,0,0,7); bar.BackgroundColor3=color; bar.BorderSizePixel=0; makeRound(bar,2)
     local tl=Instance.new("TextLabel",card); tl.Size=UDim2.new(1,-16,0,20)
     tl.Position=UDim2.new(0,14,0,10); tl.BackgroundTransparency=1; tl.Text=title
-    tl.TextColor3=C_TEXT(); tl.TextSize=fs(12); tl.Font=Enum.Font.GothamBold; tl.TextXAlignment=Enum.TextXAlignment.Left
+    tl.TextColor3=C_TEXT; tl.TextSize=fs(12); tl.Font=Enum.Font.GothamBold
+    tl.TextXAlignment=Enum.TextXAlignment.Left
     local bl=Instance.new("TextLabel",card); bl.Size=UDim2.new(1,-16,0,20)
     bl.Position=UDim2.new(0,14,0,32); bl.BackgroundTransparency=1; bl.Text=content
-    bl.TextColor3=C_MUTED(); bl.TextSize=fs(10); bl.Font=Enum.Font.Gotham
+    bl.TextColor3=C_MUTED; bl.TextSize=fs(10); bl.Font=Enum.Font.Gotham
     bl.TextXAlignment=Enum.TextXAlignment.Left; bl.TextTruncate=Enum.TextTruncate.AtEnd
     task.delay(duration,function()
         if card and card.Parent then
@@ -396,20 +446,22 @@ local function Notify(title,content,duration,color)
 end
 
 -- =============================================
---// TOOLTIP SYSTEM
+--// TOOLTIP SYSTEM \\--
 -- =============================================
 local TooltipGui=Instance.new("ScreenGui")
 TooltipGui.Name="BLTooltip"; TooltipGui.ResetOnSpawn=false; TooltipGui.DisplayOrder=1003
-TooltipGui.IgnoreGuiInset=true; TooltipGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; TooltipGui.Parent=playerGui
+TooltipGui.IgnoreGuiInset=true; TooltipGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+TooltipGui.Parent=playerGui
 
 local TooltipFrame=Instance.new("Frame",TooltipGui)
-TooltipFrame.Size=UDim2.new(0,180,0,32); TooltipFrame.BackgroundColor3=C_PANEL()
+TooltipFrame.Size=UDim2.new(0,180,0,32); TooltipFrame.BackgroundColor3=C_PANEL
 TooltipFrame.BorderSizePixel=0; TooltipFrame.Visible=false; TooltipFrame.ZIndex=10
-makeRound(TooltipFrame,6); makeStroke(TooltipFrame,C_STROKE(),1)
+makeRound(TooltipFrame,6); makeStroke(TooltipFrame,C_STROKE,1)
 local TooltipLabel=Instance.new("TextLabel",TooltipFrame)
 TooltipLabel.Size=UDim2.new(1,-12,1,0); TooltipLabel.Position=UDim2.new(0,6,0,0)
-TooltipLabel.BackgroundTransparency=1; TooltipLabel.TextColor3=C_TEXT(); TooltipLabel.TextSize=fs(10)
-TooltipLabel.Font=Enum.Font.Gotham; TooltipLabel.TextXAlignment=Enum.TextXAlignment.Left; TooltipLabel.TextWrapped=true
+TooltipLabel.BackgroundTransparency=1; TooltipLabel.TextColor3=C_TEXT; TooltipLabel.TextSize=fs(10)
+TooltipLabel.Font=Enum.Font.Gotham; TooltipLabel.TextXAlignment=Enum.TextXAlignment.Left
+TooltipLabel.TextWrapped=true
 
 local tooltipThread=nil
 local function showTooltip(text,guiObject)
@@ -421,7 +473,8 @@ local function showTooltip(text,guiObject)
         local tw=math.min(180,#text*6.5+16)
         TooltipFrame.Size=UDim2.new(0,tw,0,32)
         local x=math.min(ap.X+as.X/2-tw/2,workspace.CurrentCamera.ViewportSize.X-tw-10)
-        TooltipFrame.Position=UDim2.new(0,math.max(5,x),0,ap.Y-38); TooltipFrame.Visible=true
+        TooltipFrame.Position=UDim2.new(0,math.max(5,x),0,ap.Y-38)
+        TooltipFrame.Visible=true
     end)
 end
 local function hideTooltip()
@@ -434,11 +487,12 @@ local function attachTooltip(obj,text)
 end
 
 -- =============================================
---// CONFIRM DIALOG
+--// CONFIRM DIALOG \\--
 -- =============================================
 local ConfirmGui=Instance.new("ScreenGui")
 ConfirmGui.Name="BLConfirm"; ConfirmGui.ResetOnSpawn=false; ConfirmGui.DisplayOrder=1005
-ConfirmGui.IgnoreGuiInset=true; ConfirmGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; ConfirmGui.Parent=playerGui
+ConfirmGui.IgnoreGuiInset=true; ConfirmGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+ConfirmGui.Parent=playerGui
 
 local function showConfirm(title,body,onYes,onNo)
     if not UISettings.ConfirmDialogs then if onYes then onYes() end; return end
@@ -447,23 +501,24 @@ local function showConfirm(title,body,onYes,onNo)
     overlay.BackgroundTransparency=0.5; overlay.BorderSizePixel=0; overlay.ZIndex=1
     local dialog=Instance.new("Frame",ConfirmGui)
     dialog.Size=UDim2.new(0,280,0,120); dialog.Position=UDim2.new(0.5,-140,0.5,-60)
-    dialog.BackgroundColor3=C_PANEL(); dialog.BorderSizePixel=0; dialog.ZIndex=2
-    makeRound(dialog,10); makeStroke(dialog,C_STROKE(),1)
+    dialog.BackgroundColor3=C_PANEL; dialog.BorderSizePixel=0; dialog.ZIndex=2
+    makeRound(dialog,10); makeStroke(dialog,C_STROKE,1)
     local titleL=Instance.new("TextLabel",dialog); titleL.Size=UDim2.new(1,-16,0,26)
     titleL.Position=UDim2.new(0,12,0,8); titleL.BackgroundTransparency=1; titleL.Text=title
-    titleL.TextColor3=C_TEXT(); titleL.TextSize=fs(13); titleL.Font=Enum.Font.GothamBold; titleL.TextXAlignment=Enum.TextXAlignment.Left
+    titleL.TextColor3=C_TEXT; titleL.TextSize=fs(13); titleL.Font=Enum.Font.GothamBold
+    titleL.TextXAlignment=Enum.TextXAlignment.Left
     local bodyL=Instance.new("TextLabel",dialog); bodyL.Size=UDim2.new(1,-16,0,32)
     bodyL.Position=UDim2.new(0,12,0,36); bodyL.BackgroundTransparency=1; bodyL.Text=body
-    bodyL.TextColor3=C_MUTED(); bodyL.TextSize=fs(11); bodyL.Font=Enum.Font.Gotham
+    bodyL.TextColor3=C_MUTED; bodyL.TextSize=fs(11); bodyL.Font=Enum.Font.Gotham
     bodyL.TextXAlignment=Enum.TextXAlignment.Left; bodyL.TextWrapped=true
     local yesBtn=Instance.new("TextButton",dialog); yesBtn.Size=UDim2.new(0,110,0,28)
     yesBtn.Position=UDim2.new(0,12,1,-36); yesBtn.BackgroundColor3=C_RED; yesBtn.Text="Yes, Continue"
     yesBtn.TextColor3=Color3.fromRGB(255,255,255); yesBtn.TextSize=fs(11); yesBtn.Font=Enum.Font.GothamBold
     yesBtn.BorderSizePixel=0; makeRound(yesBtn,6)
     local noBtn=Instance.new("TextButton",dialog); noBtn.Size=UDim2.new(0,110,0,28)
-    noBtn.Position=UDim2.new(1,-122,1,-36); noBtn.BackgroundColor3=C_CARD(); noBtn.Text="Cancel"
-    noBtn.TextColor3=C_TEXT(); noBtn.TextSize=fs(11); noBtn.Font=Enum.Font.GothamMedium
-    noBtn.BorderSizePixel=0; makeRound(noBtn,6); makeStroke(noBtn,C_STROKE(),1)
+    noBtn.Position=UDim2.new(1,-122,1,-36); noBtn.BackgroundColor3=C_CARD; noBtn.Text="Cancel"
+    noBtn.TextColor3=C_TEXT; noBtn.TextSize=fs(11); noBtn.Font=Enum.Font.GothamMedium
+    noBtn.BorderSizePixel=0; makeRound(noBtn,6); makeStroke(noBtn,C_STROKE,1)
     local function close() dialog:Destroy(); overlay:Destroy() end
     yesBtn.MouseButton1Click:Connect(function() close(); if onYes then onYes() end end)
     noBtn.MouseButton1Click:Connect(function() close(); if onNo then onNo() end end)
@@ -473,7 +528,7 @@ local function showConfirm(title,body,onYes,onNo)
 end
 
 -- =============================================
---// DIM OVERLAY
+--// DIM OVERLAY — FIXED \\--
 -- =============================================
 local DimGui=Instance.new("ScreenGui")
 DimGui.Name="BLDim"; DimGui.ResetOnSpawn=false; DimGui.DisplayOrder=999
@@ -482,33 +537,38 @@ local DimFrame=Instance.new("Frame",DimGui)
 DimFrame.Size=UDim2.new(1,0,1,0); DimFrame.BackgroundColor3=Color3.fromRGB(0,0,0)
 DimFrame.BackgroundTransparency=1; DimFrame.BorderSizePixel=0
 
-local dimDesiredState=false
+-- FIX: Track dim state explicitly; sync DimGui.Enabled with MainGui.Enabled
+local dimDesiredState = false
 local function setDimOverlay(enabled)
-    dimDesiredState=enabled; UISettings.DimOverlay=enabled
+    dimDesiredState = enabled
+    UISettings.DimOverlay = enabled
     if enabled then
-        DimGui.Enabled=true; DimFrame.Visible=true
+        DimGui.Enabled = true
+        DimFrame.Visible = true
         TweenService:Create(DimFrame,TweenInfo.new(0.3),{BackgroundTransparency=0.55}):Play()
     else
         TweenService:Create(DimFrame,TweenInfo.new(0.3),{BackgroundTransparency=1}):Play()
-        task.delay(0.32,function() DimFrame.Visible=false; DimGui.Enabled=false end)
+        task.delay(0.32, function()
+            DimFrame.Visible = false
+            DimGui.Enabled = false
+        end)
     end
 end
 
 -- =============================================
---// EXTERNAL OVERLAYS
+--// EXTERNAL OVERLAY SYSTEM \\--
 -- =============================================
 local ExternalOverlays={}
-
 local function createExternalOverlay(title,lines,accentColor)
-    accentColor=accentColor or C_ACCENT()
+    accentColor=accentColor or C_ACCENT
     local gui=Instance.new("ScreenGui"); gui.Name="Overlay_"..title:gsub("%s","")
     gui.ResetOnSpawn=false; gui.DisplayOrder=1002; gui.IgnoreGuiInset=true
     gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; gui.Parent=playerGui
     local win=Instance.new("Frame",gui)
     win.Size=UDim2.new(0,200,0,30+#lines*22+8)
     win.Position=UDim2.new(0,20+#ExternalOverlays*210,0,80)
-    win.BackgroundColor3=C_BG(); win.BorderSizePixel=0; win.Active=true
-    makeRound(win,8); makeStroke(win,C_STROKE(),1)
+    win.BackgroundColor3=C_BG; win.BorderSizePixel=0; win.Active=true
+    makeRound(win,8); makeStroke(win,C_STROKE,1)
     local topBar=Instance.new("Frame",win); topBar.Size=UDim2.new(1,0,0,3)
     topBar.BackgroundColor3=accentColor; topBar.BorderSizePixel=0; makeRound(topBar,8)
     local tbFill=Instance.new("Frame",topBar); tbFill.Size=UDim2.new(1,0,0.5,0)
@@ -517,18 +577,19 @@ local function createExternalOverlay(title,lines,accentColor)
     titleBar.Position=UDim2.new(0,0,0,3); titleBar.BackgroundTransparency=1; titleBar.BorderSizePixel=0
     local titleLbl=Instance.new("TextLabel",titleBar); titleLbl.Size=UDim2.new(1,-30,1,0)
     titleLbl.Position=UDim2.new(0,10,0,0); titleLbl.BackgroundTransparency=1; titleLbl.Text=title
-    titleLbl.TextColor3=C_TEXT(); titleLbl.TextSize=fs(11); titleLbl.Font=Enum.Font.GothamBold; titleLbl.TextXAlignment=Enum.TextXAlignment.Left
+    titleLbl.TextColor3=C_TEXT; titleLbl.TextSize=fs(11); titleLbl.Font=Enum.Font.GothamBold
+    titleLbl.TextXAlignment=Enum.TextXAlignment.Left
     local closeBtn=Instance.new("TextButton",titleBar); closeBtn.Size=UDim2.new(0,16,0,16)
     closeBtn.Position=UDim2.new(1,-20,0.5,-8); closeBtn.BackgroundColor3=Color3.fromRGB(239,68,68)
     closeBtn.Text="✕"; closeBtn.TextColor3=Color3.fromRGB(255,255,255); closeBtn.TextSize=8
     closeBtn.Font=Enum.Font.GothamBold; closeBtn.BorderSizePixel=0; makeRound(closeBtn,8)
     local div=Instance.new("Frame",win); div.Size=UDim2.new(1,-16,0,1)
-    div.Position=UDim2.new(0,8,0,30); div.BackgroundColor3=C_STROKE(); div.BorderSizePixel=0
+    div.Position=UDim2.new(0,8,0,30); div.BackgroundColor3=C_STROKE; div.BorderSizePixel=0
     local labelRefs={}
     for i,line in ipairs(lines) do
         local lbl=Instance.new("TextLabel",win); lbl.Size=UDim2.new(1,-16,0,18)
         lbl.Position=UDim2.new(0,8,0,34+(i-1)*22); lbl.BackgroundTransparency=1
-        lbl.Text=line; lbl.TextColor3=C_MUTED(); lbl.TextSize=fs(10)
+        lbl.Text=line; lbl.TextColor3=C_MUTED; lbl.TextSize=fs(10)
         lbl.Font=Enum.Font.GothamMedium; lbl.TextXAlignment=Enum.TextXAlignment.Left
         lbl.TextTruncate=Enum.TextTruncate.AtEnd; table.insert(labelRefs,lbl)
     end
@@ -539,10 +600,13 @@ local function createExternalOverlay(title,lines,accentColor)
         end)
         UIS.InputChanged:Connect(function(inp)
             if dg and inp.UserInputType==Enum.UserInputType.MouseMovement then
-                local d=inp.Position-ds; win.Position=UDim2.new(ws.X.Scale,ws.X.Offset+d.X,ws.Y.Scale,ws.Y.Offset+d.Y)
+                local d=inp.Position-ds
+                win.Position=UDim2.new(ws.X.Scale,ws.X.Offset+d.X,ws.Y.Scale,ws.Y.Offset+d.Y)
             end
         end)
-        UIS.InputEnded:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then dg=false end end)
+        UIS.InputEnded:Connect(function(inp)
+            if inp.UserInputType==Enum.UserInputType.MouseButton1 then dg=false end
+        end)
     end
     closeBtn.MouseButton1Click:Connect(function()
         gui:Destroy()
@@ -552,7 +616,6 @@ local function createExternalOverlay(title,lines,accentColor)
     table.insert(ExternalOverlays,entry); return entry
 end
 
--- Overlays spawners
 local function spawnAntiAFKOverlay()
     for _,e in ipairs(ExternalOverlays) do if e.gui and e.gui.Name=="Overlay_AntiAFK" then return end end
     local entry=createExternalOverlay("Anti AFK",{"Status: Idle","Method: VirtualUser","Interval: 15s"},C_GREEN)
@@ -560,17 +623,17 @@ local function spawnAntiAFKOverlay()
     RunService.Heartbeat:Connect(function()
         if not entry.gui or not entry.gui.Parent then return end
         entry.labels[1].Text="Status: "..(AntiAFK.Enabled and "🟢 Active" or "⚫ Idle")
-        entry.labels[1].TextColor3=AntiAFK.Enabled and C_GREEN or C_MUTED()
+        entry.labels[1].TextColor3=AntiAFK.Enabled and C_GREEN or C_MUTED
     end)
 end
 local function spawnClashOverlay()
     for _,e in ipairs(ExternalOverlays) do if e.gui and e.gui.Name=="Overlay_AutoClash" then return end end
-    local entry=createExternalOverlay("Auto Clash",{"Status: Idle","Keybind: F","Buttons: —"},C_ACCENT())
+    local entry=createExternalOverlay("Auto Clash",{"Status: Idle","Keybind: F","Buttons: —"},C_ACCENT)
     entry.gui.Name="Overlay_AutoClash"
     RunService.Heartbeat:Connect(function()
         if not entry.gui or not entry.gui.Parent then return end
         entry.labels[1].Text="Status: "..(ClashSettings.AutoClash and "🟢 Running" or "⚫ Idle")
-        entry.labels[1].TextColor3=ClashSettings.AutoClash and C_GREEN or C_MUTED()
+        entry.labels[1].TextColor3=ClashSettings.AutoClash and C_GREEN or C_MUTED
         entry.labels[2].Text="Keybind: "..ClashSettings.ClashKeybind.Name
     end)
 end
@@ -581,11 +644,13 @@ local function spawnDexOverlay()
     RunService.Heartbeat:Connect(function()
         if not entry.gui or not entry.gui.Parent then return end
         entry.labels[1].Text="Status: "..(dexGrindActive and "🟢 Grinding" or "⚫ Idle")
-        entry.labels[1].TextColor3=dexGrindActive and C_GREEN or C_MUTED()
+        entry.labels[1].TextColor3=dexGrindActive and C_GREEN or C_MUTED
         entry.labels[2].Text="Bag: "..dexSelectedBox
         if dexGrindActive and dexGoalVal and dexGoalVal>0 then
-            entry.labels[3].Text=string.format("Progress: %d / %d",dexCurrentVal,dexGoalVal)
-        else entry.labels[3].Text="Progress: —" end
+            entry.labels[3].Text=string.format("Progress: %d / %d", dexCurrentVal, dexGoalVal)
+        else
+            entry.labels[3].Text="Progress: —"
+        end
         entry.labels[4].Text="Session: "..getSessionTime()
     end)
 end
@@ -596,14 +661,14 @@ local function spawnRejoinOverlay()
     RunService.Heartbeat:Connect(function()
         if not entry.gui or not entry.gui.Parent then return end
         entry.labels[1].Text="Status: "..(AutoRejoin.Enabled and "🟢 Active" or "⚫ Off")
-        entry.labels[1].TextColor3=AutoRejoin.Enabled and C_GREEN or C_MUTED()
+        entry.labels[1].TextColor3=AutoRejoin.Enabled and C_GREEN or C_MUTED
         entry.labels[2].Text="Method: "..AutoRejoin.Method
         entry.labels[3].Text="Delay: "..AutoRejoin.Delay.."s"
     end)
 end
 local function spawnSessionOverlay()
     for _,e in ipairs(ExternalOverlays) do if e.gui and e.gui.Name=="Overlay_Session" then return end end
-    local entry=createExternalOverlay("Session Timer",{"Time: 0m 00s","Dex: Idle","Clash: Idle","Noclip: Off"},C_ACCENT())
+    local entry=createExternalOverlay("Session Timer",{"Time: 0m 00s","Dex: Idle","Clash: Idle","Noclip: Off"},C_ACCENT)
     entry.gui.Name="Overlay_Session"
     RunService.Heartbeat:Connect(function()
         if not entry.gui or not entry.gui.Parent then return end
@@ -615,7 +680,7 @@ local function spawnSessionOverlay()
 end
 
 -- =============================================
---// MAIN GUI SCAFFOLD
+--// MAIN GUI SCAFFOLD \\--
 -- =============================================
 local MainGui=Instance.new("ScreenGui")
 MainGui.Name="BoxingLeagueUI"; MainGui.ResetOnSpawn=false; MainGui.DisplayOrder=1000
@@ -623,8 +688,8 @@ MainGui.IgnoreGuiInset=true; MainGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;
 
 local Root=Instance.new("Frame",MainGui)
 Root.Size=UDim2.new(0,740,0,470); Root.Position=UDim2.new(0.5,-370,0.5,-235)
-Root.BackgroundColor3=C_BG(); Root.BorderSizePixel=0; Root.Active=true
-makeRound(Root,10); makeStroke(Root,C_STROKE(),1.2)
+Root.BackgroundColor3=C_BG; Root.BorderSizePixel=0; Root.Active=true
+makeRound(Root,10); makeStroke(Root,C_STROKE,1.2)
 
 do
     local ws=loadWindowState()
@@ -634,17 +699,28 @@ do
     end
 end
 
--- Status bar
+-- =============================================
+--// STATUS BAR (BOTTOM STRIP) \\--
+-- =============================================
 local StatusBar=Instance.new("Frame",Root)
-StatusBar.Size=UDim2.new(1,0,0,20); StatusBar.Position=UDim2.new(0,0,1,-20)
-StatusBar.BackgroundColor3=C_SIDEBAR(); StatusBar.BorderSizePixel=0; StatusBar.ZIndex=5; makeRound(StatusBar,10)
-local SBFill=Instance.new("Frame",StatusBar); SBFill.Size=UDim2.new(1,0,0.5,0)
-SBFill.Position=UDim2.new(0,0,0.5,0); SBFill.BackgroundColor3=C_SIDEBAR(); SBFill.BorderSizePixel=0
-local SBDiv=Instance.new("Frame",StatusBar); SBDiv.Size=UDim2.new(1,0,0,1); SBDiv.BackgroundColor3=C_STROKE(); SBDiv.BorderSizePixel=0
-local SBInner=Instance.new("Frame",StatusBar); SBInner.Size=UDim2.new(1,-20,1,0)
-SBInner.Position=UDim2.new(0,10,0,0); SBInner.BackgroundTransparency=1; SBInner.BorderSizePixel=0
-local SBList=Instance.new("UIListLayout",SBInner); SBList.FillDirection=Enum.FillDirection.Horizontal
-SBList.VerticalAlignment=Enum.VerticalAlignment.Center; SBList.Padding=UDim.new(0,10)
+StatusBar.Size=UDim2.new(1,0,0,20)
+StatusBar.Position=UDim2.new(0,0,1,-20)
+StatusBar.BackgroundColor3=C_SIDEBAR
+StatusBar.BorderSizePixel=0
+StatusBar.ZIndex=5
+makeRound(StatusBar,10)
+-- fill top half to merge with content
+local SBFill=Instance.new("Frame",StatusBar)
+SBFill.Size=UDim2.new(1,0,0.5,0); SBFill.BackgroundColor3=C_SIDEBAR; SBFill.BorderSizePixel=0
+local SBDiv=Instance.new("Frame",StatusBar)
+SBDiv.Size=UDim2.new(1,0,0,1); SBDiv.BackgroundColor3=C_STROKE; SBDiv.BorderSizePixel=0
+local SBInner=Instance.new("Frame",StatusBar)
+SBInner.Size=UDim2.new(1,-20,1,0); SBInner.Position=UDim2.new(0,10,0,0)
+SBInner.BackgroundTransparency=1; SBInner.BorderSizePixel=0
+local SBList=Instance.new("UIListLayout",SBInner)
+SBList.FillDirection=Enum.FillDirection.Horizontal
+SBList.VerticalAlignment=Enum.VerticalAlignment.Center
+SBList.Padding=UDim.new(0,10)
 
 local statusDots={}
 local statusDotDefs={
@@ -655,21 +731,27 @@ local statusDotDefs={
     {key="rejoin", label="Rejoin", getFn=function() return AutoRejoin.Enabled end},
     {key="cam",    label="Camera", getFn=function() return CameraSettings.BrokenCamera end},
 }
-for _,def in ipairs(statusDotDefs) do
-    local wrap=Instance.new("Frame",SBInner); wrap.Size=UDim2.new(0,0,1,0); wrap.AutomaticSize=Enum.AutomaticSize.X
+for i,def in ipairs(statusDotDefs) do
+    local wrap=Instance.new("Frame",SBInner)
+    wrap.Size=UDim2.new(0,0,1,0); wrap.AutomaticSize=Enum.AutomaticSize.X
     wrap.BackgroundTransparency=1; wrap.BorderSizePixel=0
-    local wlist=Instance.new("UIListLayout",wrap); wlist.FillDirection=Enum.FillDirection.Horizontal
-    wlist.VerticalAlignment=Enum.VerticalAlignment.Center; wlist.Padding=UDim.new(0,3)
+    local wlist=Instance.new("UIListLayout",wrap)
+    wlist.FillDirection=Enum.FillDirection.Horizontal
+    wlist.VerticalAlignment=Enum.VerticalAlignment.Center
+    wlist.Padding=UDim.new(0,3)
     local dot=Instance.new("Frame",wrap); dot.Size=UDim2.new(0,6,0,6)
-    dot.BackgroundColor3=C_MUTED(); dot.BorderSizePixel=0; makeRound(dot,4)
+    dot.BackgroundColor3=C_MUTED; dot.BorderSizePixel=0; makeRound(dot,4)
     local lbl=Instance.new("TextLabel",wrap); lbl.Size=UDim2.new(0,0,1,0); lbl.AutomaticSize=Enum.AutomaticSize.X
-    lbl.BackgroundTransparency=1; lbl.Text=def.label; lbl.TextColor3=C_MUTED(); lbl.TextSize=fs(9); lbl.Font=Enum.Font.Gotham
+    lbl.BackgroundTransparency=1; lbl.Text=def.label; lbl.TextColor3=C_MUTED
+    lbl.TextSize=fs(9); lbl.Font=Enum.Font.Gotham
     statusDots[def.key]={dot=dot,lbl=lbl}
 end
+-- Session timer on right of status bar
 local SBSession=Instance.new("TextLabel",StatusBar)
 SBSession.Size=UDim2.new(0,120,1,0); SBSession.Position=UDim2.new(1,-125,0,0)
-SBSession.BackgroundTransparency=1; SBSession.Text="0m 00s"; SBSession.TextColor3=C_MUTED()
-SBSession.TextSize=fs(9); SBSession.Font=Enum.Font.Gotham; SBSession.TextXAlignment=Enum.TextXAlignment.Right
+SBSession.BackgroundTransparency=1; SBSession.Text="0m 00s"
+SBSession.TextColor3=C_MUTED; SBSession.TextSize=fs(9); SBSession.Font=Enum.Font.Gotham
+SBSession.TextXAlignment=Enum.TextXAlignment.Right
 
 RunService.Heartbeat:Connect(function()
     if not StatusBar or not StatusBar.Parent then return end
@@ -678,14 +760,17 @@ RunService.Heartbeat:Connect(function()
         for _,def in ipairs(statusDotDefs) do
             if def.key==key then
                 local on=def.getFn()
-                refs.dot.BackgroundColor3=on and C_GREEN or C_MUTED()
-                refs.lbl.TextColor3=on and C_GREEN or C_MUTED(); break
+                refs.dot.BackgroundColor3 = on and C_GREEN or C_MUTED
+                refs.lbl.TextColor3 = on and C_GREEN or C_MUTED
+                break
             end
         end
     end
 end)
 
--- Resize handles
+-- =============================================
+--// RESIZE HANDLES \\--
+-- =============================================
 local MIN_W,MIN_H,MAX_W,MAX_H=560,360,1100,700
 local function addResizeHandle(parent,edge)
     local handle=Instance.new("TextButton",parent); handle.BackgroundTransparency=1
@@ -714,8 +799,9 @@ local function addResizeHandle(parent,edge)
     elseif edge=="corner" then
         handle.Size=UDim2.new(0,12,0,12); handle.Position=UDim2.new(1,-12,1,-12)
         local corner=Instance.new("TextLabel",handle); corner.Size=UDim2.new(1,0,1,0)
-        corner.BackgroundTransparency=1; corner.Text="⌟"; corner.TextColor3=C_MUTED(); corner.TextSize=14
-        corner.Font=Enum.Font.GothamBold; corner.TextXAlignment=Enum.TextXAlignment.Right; corner.TextYAlignment=Enum.TextYAlignment.Bottom
+        corner.BackgroundTransparency=1; corner.Text="⌟"; corner.TextColor3=C_MUTED; corner.TextSize=14
+        corner.Font=Enum.Font.GothamBold; corner.TextXAlignment=Enum.TextXAlignment.Right
+        corner.TextYAlignment=Enum.TextYAlignment.Bottom
         handle.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 then resizing=true; startPos=inp.Position; startSize=Root.AbsoluteSize end
         end)
@@ -735,53 +821,69 @@ end
 addResizeHandle(Root,"right"); addResizeHandle(Root,"bottom"); addResizeHandle(Root,"corner")
 
 -- =============================================
---// TOPBAR
+--// TOPBAR \\--
 -- =============================================
 local Topbar=Instance.new("Frame",Root)
-Topbar.Size=UDim2.new(1,0,0,40); Topbar.BackgroundColor3=C_SIDEBAR(); Topbar.BorderSizePixel=0; makeRound(Topbar,10)
+Topbar.Size=UDim2.new(1,0,0,40); Topbar.BackgroundColor3=C_SIDEBAR; Topbar.BorderSizePixel=0
+makeRound(Topbar,10)
 local TFill=Instance.new("Frame",Topbar); TFill.Size=UDim2.new(1,0,0.5,0)
-TFill.Position=UDim2.new(0,0,0.5,0); TFill.BackgroundColor3=C_SIDEBAR(); TFill.BorderSizePixel=0
+TFill.Position=UDim2.new(0,0,0.5,0); TFill.BackgroundColor3=C_SIDEBAR; TFill.BorderSizePixel=0
 local TDiv=Instance.new("Frame",Topbar); TDiv.Size=UDim2.new(1,0,0,1)
-TDiv.Position=UDim2.new(0,0,1,-1); TDiv.BackgroundColor3=C_STROKE(); TDiv.BorderSizePixel=0
+TDiv.Position=UDim2.new(0,0,1,-1); TDiv.BackgroundColor3=C_STROKE; TDiv.BorderSizePixel=0
 
 local LogoLabel=Instance.new("TextLabel",Topbar); LogoLabel.Size=UDim2.new(0,130,0,20)
 LogoLabel.Position=UDim2.new(0,14,0,5); LogoLabel.BackgroundTransparency=1
-LogoLabel.Text="BOXING LEAGUE"; LogoLabel.TextColor3=C_TEXT(); LogoLabel.TextSize=fs(12)
+LogoLabel.Text="BOXING LEAGUE"; LogoLabel.TextColor3=C_TEXT; LogoLabel.TextSize=fs(12)
 LogoLabel.Font=Enum.Font.GothamBlack; LogoLabel.TextXAlignment=Enum.TextXAlignment.Left
 local ByLabel=Instance.new("TextLabel",Topbar); ByLabel.Size=UDim2.new(0,80,0,14)
 ByLabel.Position=UDim2.new(0,14,0,23); ByLabel.BackgroundTransparency=1; ByLabel.Text="by Zebra"
-ByLabel.TextColor3=C_ACCENT(); ByLabel.TextSize=fs(9); ByLabel.Font=Enum.Font.GothamMedium; ByLabel.TextXAlignment=Enum.TextXAlignment.Left
+ByLabel.TextColor3=C_ACCENT; ByLabel.TextSize=fs(9); ByLabel.Font=Enum.Font.GothamMedium
+ByLabel.TextXAlignment=Enum.TextXAlignment.Left
 
+-- Active count badge
 local ActiveBadge=Instance.new("Frame",Topbar)
 ActiveBadge.Size=UDim2.new(0,0,0,16); ActiveBadge.AutomaticSize=Enum.AutomaticSize.X
-ActiveBadge.Position=UDim2.new(0,120,0,6); ActiveBadge.BackgroundColor3=C_ACCENT()
+ActiveBadge.Position=UDim2.new(0,120,0,6); ActiveBadge.BackgroundColor3=C_ACCENT
 ActiveBadge.BorderSizePixel=0; makeRound(ActiveBadge,8); ActiveBadge.Visible=false
 local ActiveBadgeLbl=Instance.new("TextLabel",ActiveBadge)
 ActiveBadgeLbl.Size=UDim2.new(0,0,1,0); ActiveBadgeLbl.AutomaticSize=Enum.AutomaticSize.X
 ActiveBadgeLbl.BackgroundTransparency=1; ActiveBadgeLbl.Text=" 0 active "
-ActiveBadgeLbl.TextColor3=Color3.fromRGB(255,255,255); ActiveBadgeLbl.TextSize=fs(9); ActiveBadgeLbl.Font=Enum.Font.GothamBold
+ActiveBadgeLbl.TextColor3=Color3.fromRGB(255,255,255); ActiveBadgeLbl.TextSize=fs(9)
+ActiveBadgeLbl.Font=Enum.Font.GothamBold
 makePadding(ActiveBadge,0,0,4,4)
 RunService.Heartbeat:Connect(function()
     if not ActiveBadge or not ActiveBadge.Parent then return end
     local n=getActiveCount()
-    if n>0 then ActiveBadge.Visible=true; ActiveBadgeLbl.Text=" "..n.." active " else ActiveBadge.Visible=false end
+    if n>0 then
+        ActiveBadge.Visible=true; ActiveBadgeLbl.Text=" "..n.." active "
+    else
+        ActiveBadge.Visible=false
+    end
 end)
 
+-- Current tab breadcrumb (center)
 local BreadcrumbLabel=Instance.new("TextLabel",Topbar)
-BreadcrumbLabel.Size=UDim2.new(0,160,0,24); BreadcrumbLabel.Position=UDim2.new(0.5,-80,0.5,-12)
+BreadcrumbLabel.Size=UDim2.new(0,160,0,24)
+BreadcrumbLabel.Position=UDim2.new(0.5,-80,0.5,-12)
 BreadcrumbLabel.BackgroundTransparency=1; BreadcrumbLabel.Text="DEX FARM"
-BreadcrumbLabel.TextColor3=C_MUTED(); BreadcrumbLabel.TextSize=fs(11)
+BreadcrumbLabel.TextColor3=C_MUTED; BreadcrumbLabel.TextSize=fs(11)
 BreadcrumbLabel.Font=Enum.Font.GothamBold; BreadcrumbLabel.TextXAlignment=Enum.TextXAlignment.Center
 
+-- Clock
 local ClockLabel=Instance.new("TextLabel",Topbar)
-ClockLabel.Size=UDim2.new(0,60,0,16); ClockLabel.Position=UDim2.new(1,-150,0.5,-8)
-ClockLabel.BackgroundTransparency=1; ClockLabel.Text="00:00"; ClockLabel.TextColor3=C_MUTED()
-ClockLabel.TextSize=fs(9); ClockLabel.Font=Enum.Font.GothamMedium; ClockLabel.TextXAlignment=Enum.TextXAlignment.Right
+ClockLabel.Size=UDim2.new(0,60,0,16)
+ClockLabel.Position=UDim2.new(1,-150,0.5,-8)
+ClockLabel.BackgroundTransparency=1; ClockLabel.Text="00:00"
+ClockLabel.TextColor3=C_MUTED; ClockLabel.TextSize=fs(9); ClockLabel.Font=Enum.Font.GothamMedium
+ClockLabel.TextXAlignment=Enum.TextXAlignment.Right
 RunService.Heartbeat:Connect(function()
     if not ClockLabel or not ClockLabel.Parent then return end
-    local t=os.date("*t"); ClockLabel.Text=string.format("%02d:%02d",t.hour,t.min)
+    local t=os.date("*t")
+    ClockLabel.Text=string.format("%02d:%02d", t.hour, t.min)
 end)
 
+-- FIX: Window control buttons with correct icons
+-- ✕ = close, − = minimize, ⊞ = maximize/mini-mode
 local CloseBtn=Instance.new("TextButton",Topbar); CloseBtn.Size=UDim2.new(0,18,0,18)
 CloseBtn.Position=UDim2.new(1,-26,0.5,-9); CloseBtn.BackgroundColor3=Color3.fromRGB(239,68,68)
 CloseBtn.Text="✕"; CloseBtn.TextColor3=Color3.fromRGB(255,255,255); CloseBtn.TextSize=9
@@ -798,27 +900,28 @@ MiniBtn.Text="⊞"; MiniBtn.TextColor3=Color3.fromRGB(0,60,30); MiniBtn.TextSize
 MiniBtn.Font=Enum.Font.GothamBold; MiniBtn.BorderSizePixel=0; makeRound(MiniBtn,9)
 
 -- =============================================
---// BODY / SIDEBAR / CONTENT / RIGHT PANEL
+--// BODY / SIDEBAR / CONTENT / RIGHT PANEL \\--
 -- =============================================
 local Body=Instance.new("Frame",Root)
-Body.Size=UDim2.new(1,0,1,-60); Body.Position=UDim2.new(0,0,0,40)
+Body.Size=UDim2.new(1,0,1,-60); Body.Position=UDim2.new(0,0,0,40) -- -60 for topbar+statusbar
 Body.BackgroundTransparency=1; Body.BorderSizePixel=0
 
 local SIDEBAR_W=160
 local Sidebar=Instance.new("Frame",Body)
-Sidebar.Size=UDim2.new(0,SIDEBAR_W,1,0); Sidebar.BackgroundColor3=C_SIDEBAR()
+Sidebar.Size=UDim2.new(0,SIDEBAR_W,1,0); Sidebar.BackgroundColor3=C_SIDEBAR
 Sidebar.BackgroundTransparency=T.SidebarAlpha; Sidebar.BorderSizePixel=0; makeRound(Sidebar,10)
 local SidebarFill=Instance.new("Frame",Sidebar); SidebarFill.Size=UDim2.new(0,10,1,0)
-SidebarFill.Position=UDim2.new(1,-10,0,0); SidebarFill.BackgroundColor3=C_SIDEBAR()
+SidebarFill.Position=UDim2.new(1,-10,0,0); SidebarFill.BackgroundColor3=C_SIDEBAR
 SidebarFill.BackgroundTransparency=T.SidebarAlpha; SidebarFill.BorderSizePixel=0
 local SideDiv=Instance.new("Frame",Sidebar); SideDiv.Size=UDim2.new(0,1,1,0)
-SideDiv.Position=UDim2.new(1,-1,0,0); SideDiv.BackgroundColor3=C_STROKE(); SideDiv.BorderSizePixel=0
+SideDiv.Position=UDim2.new(1,-1,0,0); SideDiv.BackgroundColor3=C_STROKE; SideDiv.BorderSizePixel=0
 
+-- Sidebar resize handle
 do
-    local sr=false; local srStart,srW
     local srHandle=Instance.new("TextButton",Sidebar); srHandle.Size=UDim2.new(0,6,1,0)
     srHandle.Position=UDim2.new(1,-6,0,0); srHandle.BackgroundTransparency=1
     srHandle.Text=""; srHandle.ZIndex=25; srHandle.BorderSizePixel=0
+    local sr=false; local srStart,srW
     srHandle.InputBegan:Connect(function(inp)
         if inp.UserInputType==Enum.UserInputType.MouseButton1 then sr=true; srStart=inp.Position.X; srW=Sidebar.AbsoluteSize.X end
     end)
@@ -829,7 +932,9 @@ do
             UISettings.CompactSidebar=(newW<80)
         end
     end)
-    UIS.InputEnded:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then sr=false end end)
+    UIS.InputEnded:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 then sr=false end
+    end)
 end
 
 local SideScroll=Instance.new("ScrollingFrame",Sidebar)
@@ -842,51 +947,60 @@ makePadding(SideScroll,10,10,0,0)
 
 local Content=Instance.new("ScrollingFrame",Body)
 Content.BackgroundTransparency=1; Content.BorderSizePixel=0
-Content.ScrollBarThickness=3; Content.ScrollBarImageColor3=C_STROKE()
+Content.ScrollBarThickness=3; Content.ScrollBarImageColor3=C_STROKE
 Content.CanvasSize=UDim2.new(0,0,0,0); Content.AutomaticCanvasSize=Enum.AutomaticSize.Y
 local ContentLayout=Instance.new("UIListLayout",Content)
 ContentLayout.SortOrder=Enum.SortOrder.LayoutOrder; ContentLayout.Padding=UDim.new(0,6)
 makePadding(Content,14,14,14,14)
 
 local RightPanel=Instance.new("Frame",Body)
-RightPanel.BackgroundColor3=C_SIDEBAR(); RightPanel.BackgroundTransparency=T.SidebarAlpha
+RightPanel.BackgroundColor3=C_SIDEBAR; RightPanel.BackgroundTransparency=T.SidebarAlpha
 RightPanel.BorderSizePixel=0; makeRound(RightPanel,10)
 local RightFill=Instance.new("Frame",RightPanel); RightFill.Size=UDim2.new(0,10,1,0)
-RightFill.BackgroundColor3=C_SIDEBAR(); RightFill.BackgroundTransparency=T.SidebarAlpha; RightFill.BorderSizePixel=0
+RightFill.BackgroundColor3=C_SIDEBAR; RightFill.BackgroundTransparency=T.SidebarAlpha; RightFill.BorderSizePixel=0
 local RightDiv=Instance.new("Frame",RightPanel); RightDiv.Size=UDim2.new(0,1,1,0)
-RightDiv.BackgroundColor3=C_STROKE(); RightDiv.BorderSizePixel=0
+RightDiv.BackgroundColor3=C_STROKE; RightDiv.BorderSizePixel=0
 
+-- Right panel tabbed header: "Status" | "Quick"
 local RightTabBar=Instance.new("Frame",RightPanel)
-RightTabBar.Size=UDim2.new(1,0,0,28); RightTabBar.BackgroundColor3=C_BG()
-RightTabBar.BorderSizePixel=0; makeRound(RightTabBar,6)
+RightTabBar.Size=UDim2.new(1,0,0,28); RightTabBar.BackgroundColor3=C_BG
+RightTabBar.BorderSizePixel=0
+makeRound(RightTabBar,6)
 local RightTabFill=Instance.new("Frame",RightTabBar)
 RightTabFill.Size=UDim2.new(1,0,0.5,0); RightTabFill.Position=UDim2.new(0,0,0.5,0)
-RightTabFill.BackgroundColor3=C_BG(); RightTabFill.BorderSizePixel=0
+RightTabFill.BackgroundColor3=C_BG; RightTabFill.BorderSizePixel=0
 makePadding(RightTabBar,3,3,3,3)
 local rtList=Instance.new("UIListLayout",RightTabBar)
 rtList.FillDirection=Enum.FillDirection.Horizontal; rtList.Padding=UDim.new(0,2)
-rtList.HorizontalAlignment=Enum.HorizontalAlignment.Center; rtList.VerticalAlignment=Enum.VerticalAlignment.Center
+rtList.HorizontalAlignment=Enum.HorizontalAlignment.Center
+rtList.VerticalAlignment=Enum.VerticalAlignment.Center
 
 local RightStatusTab=Instance.new("TextButton",RightTabBar)
-RightStatusTab.Size=UDim2.new(0.5,-2,1,0); RightStatusTab.BackgroundColor3=C_ACCENT()
+RightStatusTab.Size=UDim2.new(0.5,-2,1,0); RightStatusTab.BackgroundColor3=C_ACCENT
 RightStatusTab.Text="Status"; RightStatusTab.TextColor3=Color3.fromRGB(255,255,255)
-RightStatusTab.TextSize=fs(10); RightStatusTab.Font=Enum.Font.GothamBold; RightStatusTab.BorderSizePixel=0; makeRound(RightStatusTab,4)
+RightStatusTab.TextSize=fs(10); RightStatusTab.Font=Enum.Font.GothamBold; RightStatusTab.BorderSizePixel=0
+makeRound(RightStatusTab,4)
 local RightQuickTab=Instance.new("TextButton",RightTabBar)
-RightQuickTab.Size=UDim2.new(0.5,-2,1,0); RightQuickTab.BackgroundColor3=C_CARD()
-RightQuickTab.Text="Quick"; RightQuickTab.TextColor3=C_MUTED()
-RightQuickTab.TextSize=fs(10); RightQuickTab.Font=Enum.Font.GothamMedium; RightQuickTab.BorderSizePixel=0; makeRound(RightQuickTab,4)
+RightQuickTab.Size=UDim2.new(0.5,-2,1,0); RightQuickTab.BackgroundColor3=C_CARD
+RightQuickTab.Text="Quick"; RightQuickTab.TextColor3=C_MUTED
+RightQuickTab.TextSize=fs(10); RightQuickTab.Font=Enum.Font.GothamMedium; RightQuickTab.BorderSizePixel=0
+makeRound(RightQuickTab,4)
 
+-- Status scroll (shown by default)
 local RightScroll=Instance.new("ScrollingFrame",RightPanel)
-RightScroll.Position=UDim2.new(0,0,0,30); RightScroll.Size=UDim2.new(1,0,1,-30)
-RightScroll.BackgroundTransparency=1; RightScroll.BorderSizePixel=0; RightScroll.ScrollBarThickness=0
+RightScroll.Position=UDim2.new(0,0,0,30)
+RightScroll.Size=UDim2.new(1,0,1,-30); RightScroll.BackgroundTransparency=1
+RightScroll.BorderSizePixel=0; RightScroll.ScrollBarThickness=0
 RightScroll.CanvasSize=UDim2.new(0,0,0,0); RightScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
 local RightLayout=Instance.new("UIListLayout",RightScroll)
 RightLayout.SortOrder=Enum.SortOrder.LayoutOrder; RightLayout.Padding=UDim.new(0,5)
 makePadding(RightScroll,10,10,10,10)
 
+-- Quick scroll (hidden by default)
 local QuickScroll=Instance.new("ScrollingFrame",RightPanel)
-QuickScroll.Position=UDim2.new(0,0,0,30); QuickScroll.Size=UDim2.new(1,0,1,-30)
-QuickScroll.BackgroundTransparency=1; QuickScroll.BorderSizePixel=0; QuickScroll.ScrollBarThickness=0
+QuickScroll.Position=UDim2.new(0,0,0,30)
+QuickScroll.Size=UDim2.new(1,0,1,-30); QuickScroll.BackgroundTransparency=1
+QuickScroll.BorderSizePixel=0; QuickScroll.ScrollBarThickness=0
 QuickScroll.CanvasSize=UDim2.new(0,0,0,0); QuickScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
 QuickScroll.Visible=false
 local QuickLayout=Instance.new("UIListLayout",QuickScroll)
@@ -898,43 +1012,57 @@ local function setRightTab(tab)
     rightActiveTab=tab
     if tab=="status" then
         RightScroll.Visible=true; QuickScroll.Visible=false
-        RightStatusTab.BackgroundColor3=C_ACCENT(); RightStatusTab.TextColor3=Color3.fromRGB(255,255,255); RightStatusTab.Font=Enum.Font.GothamBold
-        RightQuickTab.BackgroundColor3=C_CARD(); RightQuickTab.TextColor3=C_MUTED(); RightQuickTab.Font=Enum.Font.GothamMedium
+        RightStatusTab.BackgroundColor3=C_ACCENT; RightStatusTab.TextColor3=Color3.fromRGB(255,255,255); RightStatusTab.Font=Enum.Font.GothamBold
+        RightQuickTab.BackgroundColor3=C_CARD; RightQuickTab.TextColor3=C_MUTED; RightQuickTab.Font=Enum.Font.GothamMedium
     else
         RightScroll.Visible=false; QuickScroll.Visible=true
-        RightQuickTab.BackgroundColor3=C_ACCENT(); RightQuickTab.TextColor3=Color3.fromRGB(255,255,255); RightQuickTab.Font=Enum.Font.GothamBold
-        RightStatusTab.BackgroundColor3=C_CARD(); RightStatusTab.TextColor3=C_MUTED(); RightStatusTab.Font=Enum.Font.GothamMedium
+        RightQuickTab.BackgroundColor3=C_ACCENT; RightQuickTab.TextColor3=Color3.fromRGB(255,255,255); RightQuickTab.Font=Enum.Font.GothamBold
+        RightStatusTab.BackgroundColor3=C_CARD; RightStatusTab.TextColor3=C_MUTED; RightStatusTab.Font=Enum.Font.GothamMedium
     end
 end
 RightStatusTab.MouseButton1Click:Connect(function() setRightTab("status") end)
 RightQuickTab.MouseButton1Click:Connect(function() setRightTab("quick") end)
 
--- Forward declarations for Quick panel
-local startAFK, stopAFK, setNoclip, startAutoClash, stopAutoClash, applyBagHighlight, clearBagHighlights
-
+-- Populate Quick panel with always-visible quick toggles
 local function buildQuickPanel()
     for _,c in ipairs(QuickScroll:GetChildren()) do
         if not c:IsA("UIListLayout") and not c:IsA("UIPadding") then c:Destroy() end
     end
     local ql1=Instance.new("TextLabel",QuickScroll); ql1.Size=UDim2.new(1,0,0,16)
-    ql1.BackgroundTransparency=1; ql1.Text="QUICK TOGGLES"; ql1.TextColor3=C_MUTED()
+    ql1.BackgroundTransparency=1; ql1.Text="QUICK TOGGLES"; ql1.TextColor3=C_MUTED
     ql1.TextSize=fs(9); ql1.Font=Enum.Font.GothamBold; ql1.TextXAlignment=Enum.TextXAlignment.Left; ql1.LayoutOrder=0
+
     local quickDefs={
-        {label="Anti AFK",    get=function() return AntiAFK.Enabled end,          toggle=function() AntiAFK.Enabled=not AntiAFK.Enabled; if AntiAFK.Enabled then startAFK() else stopAFK() end end},
-        {label="Noclip",      get=function() return NoclipSettings.Enabled end,   toggle=function() NoclipSettings.Enabled=not NoclipSettings.Enabled; setNoclip(NoclipSettings.Enabled) end},
-        {label="Auto Clash",  get=function() return ClashSettings.AutoClash end,  toggle=function() ClashSettings.AutoClash=not ClashSettings.AutoClash; if ClashSettings.AutoClash then startAutoClash() else stopAutoClash() end end},
-        {label="Bag Highlight",get=function() return BagHighlightEnabled end,     toggle=function() BagHighlightEnabled=not BagHighlightEnabled; if BagHighlightEnabled then applyBagHighlight(dexSelectedBox) else clearBagHighlights() end end},
+        {label="Anti AFK",    get=function() return AntiAFK.Enabled end, toggle=function()
+            AntiAFK.Enabled=not AntiAFK.Enabled
+            if AntiAFK.Enabled then afkEnabled=true; startAFK() else stopAFK(); afkEnabled=false end
+        end},
+        {label="Noclip",      get=function() return NoclipSettings.Enabled end, toggle=function()
+            NoclipSettings.Enabled=not NoclipSettings.Enabled; setNoclip(NoclipSettings.Enabled)
+        end},
+        {label="Auto Clash",  get=function() return ClashSettings.AutoClash end, toggle=function()
+            ClashSettings.AutoClash=not ClashSettings.AutoClash
+            if ClashSettings.AutoClash then startAutoClash() else stopAutoClash() end
+        end},
+        {label="Bag Highlight",get=function() return BagHighlightEnabled end, toggle=function()
+            BagHighlightEnabled=not BagHighlightEnabled
+            if BagHighlightEnabled then applyBagHighlight(dexSelectedBox) else clearBagHighlights() end
+        end},
     }
     for i,def in ipairs(quickDefs) do
         local card=Instance.new("Frame",QuickScroll); card.Size=UDim2.new(1,0,0,32)
-        card.BackgroundColor3=C_CARD(); card.BorderSizePixel=0; card.LayoutOrder=i
-        makeRound(card,6); makeStroke(card,C_STROKE(),1)
+        card.BackgroundColor3=C_CARD; card.BorderSizePixel=0; card.LayoutOrder=i
+        makeRound(card,6); makeStroke(card,C_STROKE,1)
         local lbl=Instance.new("TextLabel",card); lbl.Size=UDim2.new(1,-50,1,0)
         lbl.Position=UDim2.new(0,10,0,0); lbl.BackgroundTransparency=1
-        lbl.Text=def.label; lbl.TextColor3=C_TEXT(); lbl.TextSize=fs(10); lbl.Font=Enum.Font.GothamMedium; lbl.TextXAlignment=Enum.TextXAlignment.Left
+        lbl.Text=def.label; lbl.TextColor3=C_TEXT; lbl.TextSize=fs(10)
+        lbl.Font=Enum.Font.GothamMedium; lbl.TextXAlignment=Enum.TextXAlignment.Left
+        -- Pill toggle switch
         local switchBg=Instance.new("Frame",card); switchBg.Size=UDim2.new(0,32,0,16)
         switchBg.Position=UDim2.new(1,-40,0.5,-8)
-        local on=def.get(); switchBg.BackgroundColor3=on and C_ACCENT() or C_MUTED(); switchBg.BorderSizePixel=0; makeRound(switchBg,8)
+        local on=def.get()
+        switchBg.BackgroundColor3=on and C_ACCENT or C_MUTED
+        switchBg.BorderSizePixel=0; makeRound(switchBg,8)
         local thumb=Instance.new("Frame",switchBg); thumb.Size=UDim2.new(0,12,0,12)
         thumb.Position=on and UDim2.new(1,-14,0.5,-6) or UDim2.new(0,2,0.5,-6)
         thumb.BackgroundColor3=Color3.fromRGB(255,255,255); thumb.BorderSizePixel=0; makeRound(thumb,6)
@@ -944,123 +1072,163 @@ local function buildQuickPanel()
         hitbox.MouseButton1Click:Connect(function()
             quickDefs[di].toggle()
             local nowOn=quickDefs[di].get()
-            TweenService:Create(switchBg,TweenInfo.new(0.15),{BackgroundColor3=nowOn and C_ACCENT() or C_MUTED()}):Play()
+            TweenService:Create(switchBg,TweenInfo.new(0.15),{BackgroundColor3=nowOn and C_ACCENT or C_MUTED}):Play()
             TweenService:Create(thumb,TweenInfo.new(0.15),{Position=nowOn and UDim2.new(1,-14,0.5,-6) or UDim2.new(0,2,0.5,-6)}):Play()
         end)
     end
 end
 
 RunService.Heartbeat:Connect(function()
+    if rightActiveTab~="quick" then return end
+    -- Sync quick panel switches
+end)
+
+RunService.Heartbeat:Connect(function()
     if Body and Body.Parent then
         local w=Root.AbsoluteSize.X
         local rightW=math.clamp(math.floor(w*0.22),140,200)
-        Content.Size=UDim2.new(1,-(SIDEBAR_W+rightW),1,0); Content.Position=UDim2.new(0,SIDEBAR_W,0,0)
-        RightPanel.Size=UDim2.new(0,rightW,1,0); RightPanel.Position=UDim2.new(1,-rightW,0,0)
+        Content.Size=UDim2.new(1,-(SIDEBAR_W+rightW),1,0)
+        Content.Position=UDim2.new(0,SIDEBAR_W,0,0)
+        RightPanel.Size=UDim2.new(0,rightW,1,0)
+        RightPanel.Position=UDim2.new(1,-rightW,0,0)
     end
 end)
 
 -- =============================================
---// SEARCH
+--// SEARCH \\--
 -- =============================================
 local SearchFrame=Instance.new("Frame",Topbar); SearchFrame.Size=UDim2.new(0,160,0,24)
-SearchFrame.Position=UDim2.new(0.5,-80,0.5,-12); SearchFrame.BackgroundColor3=C_CARD(); SearchFrame.BorderSizePixel=0
-makeRound(SearchFrame,5); makeStroke(SearchFrame,C_STROKE(),1)
+SearchFrame.Position=UDim2.new(0.5,-80,0.5,-12); SearchFrame.BackgroundColor3=C_CARD; SearchFrame.BorderSizePixel=0
+makeRound(SearchFrame,5); makeStroke(SearchFrame,C_STROKE,1)
 local SearchIcon=Instance.new("TextLabel",SearchFrame); SearchIcon.Size=UDim2.new(0,20,1,0)
-SearchIcon.BackgroundTransparency=1; SearchIcon.Text="🔍"; SearchIcon.TextSize=10; SearchIcon.TextColor3=C_MUTED(); SearchIcon.Font=Enum.Font.Gotham
+SearchIcon.BackgroundTransparency=1; SearchIcon.Text="🔍"; SearchIcon.TextSize=10
+SearchIcon.TextColor3=C_MUTED; SearchIcon.Font=Enum.Font.Gotham
 local SearchBox=Instance.new("TextBox",SearchFrame); SearchBox.Size=UDim2.new(1,-22,1,0)
 SearchBox.Position=UDim2.new(0,20,0,0); SearchBox.BackgroundTransparency=1
-SearchBox.Text=""; SearchBox.PlaceholderText="Search..."; SearchBox.PlaceholderColor3=C_MUTED()
-SearchBox.TextColor3=C_TEXT(); SearchBox.TextSize=fs(11); SearchBox.Font=Enum.Font.Gotham
+SearchBox.Text=""; SearchBox.PlaceholderText="Search..."; SearchBox.PlaceholderColor3=C_MUTED
+SearchBox.TextColor3=C_TEXT; SearchBox.TextSize=fs(11); SearchBox.Font=Enum.Font.Gotham
 SearchBox.ClearTextOnFocus=false; SearchBox.TextXAlignment=Enum.TextXAlignment.Left
 
 -- =============================================
---// UI COMPONENT BUILDERS
+--// UI COMPONENT BUILDERS \\--
 -- =============================================
 local function makeSectionLabel(parent,text,order)
     local lbl=Instance.new("TextLabel",parent); lbl.Size=UDim2.new(1,0,0,18)
-    lbl.BackgroundTransparency=1; lbl.Text=text:upper(); lbl.TextColor3=C_MUTED()
+    lbl.BackgroundTransparency=1; lbl.Text=text:upper(); lbl.TextColor3=C_MUTED
     lbl.TextSize=fs(9); lbl.Font=Enum.Font.GothamBold; lbl.TextXAlignment=Enum.TextXAlignment.Left
     lbl.LayoutOrder=order or 0; return lbl
 end
 
 local function makeCard(parent,order)
     local card=Instance.new("Frame",parent); card.Size=UDim2.new(1,0,0,0)
-    card.AutomaticSize=Enum.AutomaticSize.Y; card.BackgroundColor3=C_CARD()
+    card.AutomaticSize=Enum.AutomaticSize.Y; card.BackgroundColor3=C_CARD
     card.BorderSizePixel=0; card.LayoutOrder=order or 0
-    makeRound(card,8); makeStroke(card,C_STROKE(),1); makeList(card,Enum.FillDirection.Vertical,0)
+    makeRound(card,8); makeStroke(card,C_STROKE,1); makeList(card,Enum.FillDirection.Vertical,0)
     return card
 end
 
+-- COLLAPSIBLE CARD
 local function makeCollapsibleCard(parent,headerText,order,startExpanded)
-    startExpanded=startExpanded~=false
+    startExpanded = startExpanded~=false
     local wrapper=Instance.new("Frame",parent); wrapper.Size=UDim2.new(1,0,0,0)
     wrapper.AutomaticSize=Enum.AutomaticSize.Y; wrapper.BackgroundTransparency=1
-    wrapper.BorderSizePixel=0; wrapper.LayoutOrder=order or 0; makeList(wrapper,Enum.FillDirection.Vertical,0)
+    wrapper.BorderSizePixel=0; wrapper.LayoutOrder=order or 0
+    makeList(wrapper,Enum.FillDirection.Vertical,0)
+
     local header=Instance.new("TextButton",wrapper)
-    header.Size=UDim2.new(1,0,0,30); header.BackgroundColor3=C_CARD(); header.BorderSizePixel=0; header.Text=""; header.ZIndex=2
-    makeRound(header,8); makeStroke(header,C_STROKE(),1)
+    header.Size=UDim2.new(1,0,0,30); header.BackgroundColor3=C_CARD
+    header.BorderSizePixel=0; header.Text=""; header.ZIndex=2
+    makeRound(header,8); makeStroke(header,C_STROKE,1)
     local hIcon=Instance.new("TextLabel",header); hIcon.Size=UDim2.new(0,20,1,0)
     hIcon.Position=UDim2.new(0,10,0,0); hIcon.BackgroundTransparency=1
-    hIcon.Text=startExpanded and "▾" or "▸"; hIcon.TextColor3=C_MUTED(); hIcon.TextSize=fs(11); hIcon.Font=Enum.Font.GothamBold
+    hIcon.Text=startExpanded and "▾" or "▸"; hIcon.TextColor3=C_MUTED
+    hIcon.TextSize=fs(11); hIcon.Font=Enum.Font.GothamBold
     local hLbl=Instance.new("TextLabel",header); hLbl.Size=UDim2.new(1,-40,1,0)
     hLbl.Position=UDim2.new(0,28,0,0); hLbl.BackgroundTransparency=1
-    hLbl.Text=headerText; hLbl.TextColor3=C_TEXT(); hLbl.TextSize=fs(11); hLbl.Font=Enum.Font.GothamBold; hLbl.TextXAlignment=Enum.TextXAlignment.Left
+    hLbl.Text=headerText; hLbl.TextColor3=C_TEXT; hLbl.TextSize=fs(11)
+    hLbl.Font=Enum.Font.GothamBold; hLbl.TextXAlignment=Enum.TextXAlignment.Left
+
     local body=Instance.new("Frame",wrapper); body.Size=UDim2.new(1,0,0,0)
-    body.AutomaticSize=Enum.AutomaticSize.Y; body.BackgroundColor3=C_CARD(); body.BorderSizePixel=0; body.Visible=startExpanded
-    makeList(body,Enum.FillDirection.Vertical,0); makeStroke(body,C_STROKE(),1)
+    body.AutomaticSize=Enum.AutomaticSize.Y; body.BackgroundColor3=C_CARD
+    body.BorderSizePixel=0; body.Visible=startExpanded
+    makeList(body,Enum.FillDirection.Vertical,0)
+    makeStroke(body,C_STROKE,1)
+
     local expanded=startExpanded
-    header.MouseButton1Click:Connect(function() expanded=not expanded; body.Visible=expanded; hIcon.Text=expanded and "▾" or "▸" end)
-    return body,wrapper
+    header.MouseButton1Click:Connect(function()
+        expanded=not expanded
+        body.Visible=expanded
+        hIcon.Text=expanded and "▾" or "▸"
+    end)
+    return body, wrapper
 end
 
 local function makeFeatureRow(card,labelText,order)
     local row=Instance.new("Frame",card); row.Size=UDim2.new(1,0,0,36)
     row.BackgroundTransparency=1; row.BorderSizePixel=0; row.LayoutOrder=order or 0
     local div=Instance.new("Frame",row); div.Size=UDim2.new(1,-24,0,1)
-    div.Position=UDim2.new(0,12,1,-1); div.BackgroundColor3=C_STROKE(); div.BackgroundTransparency=0.45; div.BorderSizePixel=0
+    div.Position=UDim2.new(0,12,1,-1); div.BackgroundColor3=C_STROKE
+    div.BackgroundTransparency=0.45; div.BorderSizePixel=0
     local lbl=Instance.new("TextLabel",row); lbl.Size=UDim2.new(1,-20,1,0)
     lbl.Position=UDim2.new(0,12,0,0); lbl.BackgroundTransparency=1; lbl.Text=labelText
-    lbl.TextColor3=C_TEXT(); lbl.TextSize=fs(11); lbl.Font=Enum.Font.GothamMedium; lbl.TextXAlignment=Enum.TextXAlignment.Left
+    lbl.TextColor3=C_TEXT; lbl.TextSize=fs(11); lbl.Font=Enum.Font.GothamMedium
+    lbl.TextXAlignment=Enum.TextXAlignment.Left
     return row,lbl,div
 end
 
+-- MODERN TOGGLE SWITCH (pill style)
 local function makeToggleRow(card,labelText,order,defaultOn,callback,tooltipText,featureKey)
     local row,lbl,div=makeFeatureRow(card,labelText,order)
     if featureKey then
         local starBtn=Instance.new("TextButton",row); starBtn.Size=UDim2.new(0,16,0,16)
         starBtn.Position=UDim2.new(0,-2,0.5,-8); starBtn.BackgroundTransparency=1
         starBtn.Text=isFavorite(featureKey) and "★" or "☆"
-        starBtn.TextColor3=isFavorite(featureKey) and C_YELLOW or C_MUTED()
+        starBtn.TextColor3=isFavorite(featureKey) and C_YELLOW or C_MUTED
         starBtn.TextSize=fs(12); starBtn.Font=Enum.Font.GothamBold; starBtn.ZIndex=3
         starBtn.MouseButton1Click:Connect(function()
-            toggleFavorite(featureKey); starBtn.Text=isFavorite(featureKey) and "★" or "☆"
-            starBtn.TextColor3=isFavorite(featureKey) and C_YELLOW or C_MUTED()
+            toggleFavorite(featureKey)
+            starBtn.Text=isFavorite(featureKey) and "★" or "☆"
+            starBtn.TextColor3=isFavorite(featureKey) and C_YELLOW or C_MUTED
         end)
         lbl.Position=UDim2.new(0,20,0,0); lbl.Size=UDim2.new(1,-72,1,0)
-    else lbl.Size=UDim2.new(1,-56,1,0) end
+    else
+        lbl.Size=UDim2.new(1,-56,1,0)
+    end
+
+    -- Pill switch (38×20)
     local switchBg=Instance.new("Frame",row); switchBg.Size=UDim2.new(0,38,0,20)
     switchBg.Position=UDim2.new(1,-46,0.5,-10)
-    switchBg.BackgroundColor3=defaultOn and C_ACCENT() or Color3.fromRGB(45,50,65)
-    switchBg.BorderSizePixel=0; makeRound(switchBg,10); makeStroke(switchBg,defaultOn and C_ACCENT_DK() or C_STROKE(),1)
+    switchBg.BackgroundColor3=defaultOn and C_ACCENT or Color3.fromRGB(45,50,65)
+    switchBg.BorderSizePixel=0; makeRound(switchBg,10)
+    makeStroke(switchBg, defaultOn and C_ACCENT_DK or C_STROKE, 1)
+
     local thumb=Instance.new("Frame",switchBg); thumb.Size=UDim2.new(0,16,0,16)
     thumb.Position=defaultOn and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
     thumb.BackgroundColor3=Color3.fromRGB(255,255,255); thumb.BorderSizePixel=0; makeRound(thumb,8)
+
     local state=defaultOn
     local hitbox=Instance.new("TextButton",row); hitbox.Size=UDim2.new(1,0,1,0)
     hitbox.BackgroundTransparency=1; hitbox.Text=""; hitbox.ZIndex=2
     if tooltipText then attachTooltip(hitbox,tooltipText) end
+
     hitbox.MouseButton1Click:Connect(function()
         state=not state
-        TweenService:Create(switchBg,TweenInfo.new(0.18),{BackgroundColor3=state and C_ACCENT() or Color3.fromRGB(45,50,65)}):Play()
+        local onCol=C_ACCENT; local offCol=Color3.fromRGB(45,50,65)
+        TweenService:Create(switchBg,TweenInfo.new(0.18),{BackgroundColor3=state and onCol or offCol}):Play()
         local sw=switchBg:FindFirstChildOfClass("UIStroke")
-        if sw then TweenService:Create(sw,TweenInfo.new(0.18),{Color=state and C_ACCENT_DK() or C_STROKE()}):Play() end
-        TweenService:Create(thumb,TweenInfo.new(0.18,Enum.EasingStyle.Quart),{Position=state and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)}):Play()
+        if sw then TweenService:Create(sw,TweenInfo.new(0.18),{Color=state and C_ACCENT_DK or C_STROKE}):Play() end
+        TweenService:Create(thumb,TweenInfo.new(0.18,Enum.EasingStyle.Quart),{
+            Position=state and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
+        }):Play()
         if callback then callback(state) end
         logAction((state and "ON" or "OFF").." — "..labelText)
     end)
+
     local function set(val)
-        state=val; switchBg.BackgroundColor3=val and C_ACCENT() or Color3.fromRGB(45,50,65)
-        local sw=switchBg:FindFirstChildOfClass("UIStroke"); if sw then sw.Color=val and C_ACCENT_DK() or C_STROKE() end
+        state=val
+        switchBg.BackgroundColor3=val and C_ACCENT or Color3.fromRGB(45,50,65)
+        local sw=switchBg:FindFirstChildOfClass("UIStroke")
+        if sw then sw.Color=val and C_ACCENT_DK or C_STROKE end
         thumb.Position=val and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
     end
     return row,set
@@ -1070,7 +1238,7 @@ local function makePill(parent,text,on)
     local pill=Instance.new("TextLabel",parent); pill.Size=UDim2.new(0,0,0,18)
     pill.AutomaticSize=Enum.AutomaticSize.X; pill.Position=UDim2.new(1,-80,0.5,-9)
     pill.BackgroundColor3=on and Color3.fromRGB(20,60,35) or Color3.fromRGB(35,35,45)
-    pill.TextColor3=on and C_GREEN or C_MUTED(); pill.Text=" "..text.." "
+    pill.TextColor3=on and C_GREEN or C_MUTED; pill.Text=" "..text.." "
     pill.TextSize=fs(10); pill.Font=Enum.Font.GothamBold; pill.BorderSizePixel=0; makeRound(pill,9)
     return pill
 end
@@ -1081,17 +1249,21 @@ local function makeButtonRow(card,labelText,order,callback,tooltipText,featureKe
         local starBtn=Instance.new("TextButton",row); starBtn.Size=UDim2.new(0,16,0,16)
         starBtn.Position=UDim2.new(0,-2,0.5,-8); starBtn.BackgroundTransparency=1
         starBtn.Text=isFavorite(featureKey) and "★" or "☆"
-        starBtn.TextColor3=isFavorite(featureKey) and C_YELLOW or C_MUTED()
+        starBtn.TextColor3=isFavorite(featureKey) and C_YELLOW or C_MUTED
         starBtn.TextSize=fs(12); starBtn.Font=Enum.Font.GothamBold; starBtn.ZIndex=3
         starBtn.MouseButton1Click:Connect(function()
-            toggleFavorite(featureKey); starBtn.Text=isFavorite(featureKey) and "★" or "☆"
-            starBtn.TextColor3=isFavorite(featureKey) and C_YELLOW or C_MUTED()
+            toggleFavorite(featureKey)
+            starBtn.Text=isFavorite(featureKey) and "★" or "☆"
+            starBtn.TextColor3=isFavorite(featureKey) and C_YELLOW or C_MUTED
         end)
         lbl.Position=UDim2.new(0,20,0,0); lbl.Size=UDim2.new(1,-40,1,0)
     end
     local arrow=Instance.new("TextLabel",row); arrow.Size=UDim2.new(0,16,1,0)
     arrow.Position=UDim2.new(1,-22,0,0); arrow.BackgroundTransparency=1
-    arrow.Text="›"; arrow.TextColor3=C_MUTED(); arrow.TextSize=16; arrow.Font=Enum.Font.GothamBold; arrow.TextXAlignment=Enum.TextXAlignment.Center
+    arrow.Text="›"; arrow.TextColor3=C_MUTED; arrow.TextSize=16
+    arrow.Font=Enum.Font.GothamBold; arrow.TextXAlignment=Enum.TextXAlignment.Center
+
+    -- Loading state support
     local loading=false
     local hitbox=Instance.new("TextButton",row); hitbox.Size=UDim2.new(1,0,1,0)
     hitbox.BackgroundTransparency=1; hitbox.Text=""; hitbox.ZIndex=2
@@ -1099,85 +1271,110 @@ local function makeButtonRow(card,labelText,order,callback,tooltipText,featureKe
     hitbox.MouseEnter:Connect(function() row.BackgroundColor3=Color3.fromRGB(35,40,55); row.BackgroundTransparency=0 end)
     hitbox.MouseLeave:Connect(function() row.BackgroundTransparency=1 end)
     hitbox.MouseButton1Click:Connect(function()
-        if loading then return end; logAction("Pressed — "..labelText)
+        if loading then return end
+        logAction("Pressed — "..labelText)
         if confirmMsg and UISettings.ConfirmDialogs then
             showConfirm("Confirm Action",confirmMsg,function() if callback then callback() end end)
-        else if callback then callback() end end
+        else
+            if callback then callback() end
+        end
     end)
-    local function setLoading(on,loadText)
+    local function setLoading(on, loadText)
         loading=on
-        if on then lbl.Text=(loadText or "Loading..."); lbl.TextColor3=C_MUTED(); arrow.Text="⏳"
-        else lbl.Text=labelText; lbl.TextColor3=C_TEXT(); arrow.Text="›" end
+        if on then
+            lbl.Text=(loadText or "Loading..."); lbl.TextColor3=C_MUTED
+            arrow.Text="⏳"
+        else
+            lbl.Text=labelText; lbl.TextColor3=C_TEXT
+            arrow.Text="›"
+        end
     end
-    return row,setLoading
+    return row, setLoading
 end
 
 local function makeSideItem(parent,text,icon,order,callback)
     local item=Instance.new("TextButton",parent); item.Size=UDim2.new(1,0,0,32)
     item.BackgroundTransparency=1; item.Text=""; item.BorderSizePixel=0; item.LayoutOrder=order
     local accent=Instance.new("Frame",item); accent.Size=UDim2.new(0,3,0.7,0)
-    accent.Position=UDim2.new(0,0,0.15,0); accent.BackgroundColor3=C_ACCENT(); accent.BorderSizePixel=0; accent.Visible=false; makeRound(accent,2)
+    accent.Position=UDim2.new(0,0,0.15,0); accent.BackgroundColor3=C_ACCENT
+    accent.BorderSizePixel=0; accent.Visible=false; makeRound(accent,2)
     local iconLbl=Instance.new("TextLabel",item); iconLbl.Size=UDim2.new(0,22,1,0)
     iconLbl.Position=UDim2.new(0,10,0,0); iconLbl.BackgroundTransparency=1
     iconLbl.Text=icon; iconLbl.TextSize=fs(13); iconLbl.Font=Enum.Font.GothamBold
-    iconLbl.TextColor3=C_MUTED(); iconLbl.TextXAlignment=Enum.TextXAlignment.Center
+    iconLbl.TextColor3=C_MUTED; iconLbl.TextXAlignment=Enum.TextXAlignment.Center
     local lbl=Instance.new("TextLabel",item); lbl.Size=UDim2.new(1,-52,1,0)
     lbl.Position=UDim2.new(0,34,0,0); lbl.BackgroundTransparency=1
-    lbl.Text=text; lbl.TextColor3=C_MUTED(); lbl.TextSize=fs(11); lbl.Font=Enum.Font.GothamMedium; lbl.TextXAlignment=Enum.TextXAlignment.Left
+    lbl.Text=text; lbl.TextColor3=C_MUTED; lbl.TextSize=fs(11)
+    lbl.Font=Enum.Font.GothamMedium; lbl.TextXAlignment=Enum.TextXAlignment.Left
+    -- Badge dot for attention
     local badge=Instance.new("Frame",item); badge.Size=UDim2.new(0,7,0,7)
-    badge.Position=UDim2.new(1,-14,0.5,-3.5); badge.BackgroundColor3=C_RED; badge.BorderSizePixel=0; makeRound(badge,4); badge.Visible=false
-    item.MouseEnter:Connect(function() if not accent.Visible then TweenService:Create(lbl,TweenInfo.new(0.1),{TextColor3=Color3.fromRGB(180,190,210)}):Play() end end)
-    item.MouseLeave:Connect(function() if not accent.Visible then TweenService:Create(lbl,TweenInfo.new(0.1),{TextColor3=C_MUTED()}):Play() end end)
+    badge.Position=UDim2.new(1,-14,0.5,-3.5); badge.BackgroundColor3=C_RED
+    badge.BorderSizePixel=0; makeRound(badge,4); badge.Visible=false
+    item.MouseEnter:Connect(function()
+        if not accent.Visible then TweenService:Create(lbl,TweenInfo.new(0.1),{TextColor3=Color3.fromRGB(180,190,210)}):Play() end
+    end)
+    item.MouseLeave:Connect(function()
+        if not accent.Visible then TweenService:Create(lbl,TweenInfo.new(0.1),{TextColor3=C_MUTED}):Play() end
+    end)
     item.MouseButton1Click:Connect(function() if callback then callback(item,accent,lbl,iconLbl) end end)
     return item,accent,lbl,iconLbl,badge
 end
 
 local function makeRightSection(text,order)
     local lbl=Instance.new("TextLabel",RightScroll); lbl.Size=UDim2.new(1,0,0,16)
-    lbl.BackgroundTransparency=1; lbl.Text=text:upper(); lbl.TextColor3=C_MUTED()
+    lbl.BackgroundTransparency=1; lbl.Text=text:upper(); lbl.TextColor3=C_MUTED
     lbl.TextSize=fs(9); lbl.Font=Enum.Font.GothamBold; lbl.TextXAlignment=Enum.TextXAlignment.Left
     lbl.LayoutOrder=order or 0; return lbl
 end
 
 local function makeRightStatus(labelText,on,order)
     local card=Instance.new("Frame",RightScroll); card.Size=UDim2.new(1,0,0,30)
-    card.BackgroundColor3=C_CARD(); card.BorderSizePixel=0; card.LayoutOrder=order or 0
-    makeRound(card,6); makeStroke(card,C_STROKE(),1)
+    card.BackgroundColor3=C_CARD; card.BorderSizePixel=0; card.LayoutOrder=order or 0
+    makeRound(card,6); makeStroke(card,C_STROKE,1)
     local dot=Instance.new("Frame",card); dot.Size=UDim2.new(0,7,0,7)
-    dot.Position=UDim2.new(0,10,0.5,-3.5); dot.BackgroundColor3=on and C_GREEN or C_MUTED(); dot.BorderSizePixel=0; makeRound(dot,4)
+    dot.Position=UDim2.new(0,10,0.5,-3.5); dot.BackgroundColor3=on and C_GREEN or C_MUTED
+    dot.BorderSizePixel=0; makeRound(dot,4)
     local lbl=Instance.new("TextLabel",card); lbl.Size=UDim2.new(1,-28,1,0)
     lbl.Position=UDim2.new(0,24,0,0); lbl.BackgroundTransparency=1
-    lbl.Text=labelText; lbl.TextColor3=C_TEXT(); lbl.TextSize=fs(10); lbl.Font=Enum.Font.GothamMedium; lbl.TextXAlignment=Enum.TextXAlignment.Left
+    lbl.Text=labelText; lbl.TextColor3=C_TEXT; lbl.TextSize=fs(10)
+    lbl.Font=Enum.Font.GothamMedium; lbl.TextXAlignment=Enum.TextXAlignment.Left
     return card,dot,lbl
 end
 
 local function makeRightDropdown(labelText,options,current,order,callback)
     local wrap=Instance.new("Frame",RightScroll); wrap.Size=UDim2.new(1,0,0,0)
-    wrap.AutomaticSize=Enum.AutomaticSize.Y; wrap.BackgroundTransparency=1; wrap.BorderSizePixel=0
-    wrap.LayoutOrder=order or 0; makeList(wrap,Enum.FillDirection.Vertical,4)
+    wrap.AutomaticSize=Enum.AutomaticSize.Y; wrap.BackgroundTransparency=1
+    wrap.BorderSizePixel=0; wrap.LayoutOrder=order or 0; makeList(wrap,Enum.FillDirection.Vertical,4)
     local lbl=Instance.new("TextLabel",wrap); lbl.Size=UDim2.new(1,0,0,14)
-    lbl.BackgroundTransparency=1; lbl.Text=labelText; lbl.TextColor3=C_MUTED()
+    lbl.BackgroundTransparency=1; lbl.Text=labelText; lbl.TextColor3=C_MUTED
     lbl.TextSize=fs(10); lbl.Font=Enum.Font.Gotham; lbl.TextXAlignment=Enum.TextXAlignment.Left
     local selected=current
     local dropFrame=Instance.new("Frame",wrap); dropFrame.Size=UDim2.new(1,0,0,28)
-    dropFrame.BackgroundColor3=C_CARD(); dropFrame.BorderSizePixel=0; makeRound(dropFrame,6); makeStroke(dropFrame,C_STROKE(),1)
+    dropFrame.BackgroundColor3=C_CARD; dropFrame.BorderSizePixel=0
+    makeRound(dropFrame,6); makeStroke(dropFrame,C_STROKE,1)
     local selLbl=Instance.new("TextLabel",dropFrame); selLbl.Size=UDim2.new(1,-24,1,0)
     selLbl.Position=UDim2.new(0,10,0,0); selLbl.BackgroundTransparency=1
-    selLbl.Text=selected; selLbl.TextColor3=C_TEXT(); selLbl.TextSize=fs(11); selLbl.Font=Enum.Font.GothamMedium; selLbl.TextXAlignment=Enum.TextXAlignment.Left
+    selLbl.Text=selected; selLbl.TextColor3=C_TEXT; selLbl.TextSize=fs(11)
+    selLbl.Font=Enum.Font.GothamMedium; selLbl.TextXAlignment=Enum.TextXAlignment.Left
     local arrow=Instance.new("TextLabel",dropFrame); arrow.Size=UDim2.new(0,18,1,0)
     arrow.Position=UDim2.new(1,-20,0,0); arrow.BackgroundTransparency=1
-    arrow.Text="▾"; arrow.TextColor3=C_MUTED(); arrow.TextSize=10; arrow.Font=Enum.Font.GothamBold; arrow.TextXAlignment=Enum.TextXAlignment.Center
+    arrow.Text="▾"; arrow.TextColor3=C_MUTED; arrow.TextSize=10
+    arrow.Font=Enum.Font.GothamBold; arrow.TextXAlignment=Enum.TextXAlignment.Center
     local optList=Instance.new("Frame",wrap); optList.Size=UDim2.new(1,0,0,0)
-    optList.AutomaticSize=Enum.AutomaticSize.Y; optList.BackgroundColor3=C_PANEL(); optList.BorderSizePixel=0; optList.Visible=false
-    makeRound(optList,6); makeStroke(optList,C_STROKE(),1); makeList(optList,Enum.FillDirection.Vertical,0)
+    optList.AutomaticSize=Enum.AutomaticSize.Y; optList.BackgroundColor3=C_PANEL
+    optList.BorderSizePixel=0; optList.Visible=false
+    makeRound(optList,6); makeStroke(optList,C_STROKE,1); makeList(optList,Enum.FillDirection.Vertical,0)
     for _,opt in ipairs(options) do
         local obtn=Instance.new("TextButton",optList); obtn.Size=UDim2.new(1,0,0,26)
         obtn.BackgroundTransparency=1; obtn.Text=opt
-        obtn.TextColor3=opt==selected and C_ACCENT() or C_TEXT(); obtn.TextSize=fs(11)
-        obtn.Font=Enum.Font.GothamMedium; obtn.TextXAlignment=Enum.TextXAlignment.Left; makePadding(obtn,0,0,10,0)
+        obtn.TextColor3=opt==selected and C_ACCENT or C_TEXT; obtn.TextSize=fs(11)
+        obtn.Font=Enum.Font.GothamMedium; obtn.TextXAlignment=Enum.TextXAlignment.Left
+        makePadding(obtn,0,0,10,0)
         obtn.MouseButton1Click:Connect(function()
             selected=opt; selLbl.Text=opt; optList.Visible=false
-            for _,c in ipairs(optList:GetChildren()) do if c:IsA("TextButton") then c.TextColor3=c.Text==opt and C_ACCENT() or C_TEXT() end end
+            for _,c in ipairs(optList:GetChildren()) do
+                if c:IsA("TextButton") then c.TextColor3=c.Text==opt and C_ACCENT or C_TEXT end
+            end
             if callback then callback(opt) end
         end)
     end
@@ -1189,26 +1386,45 @@ end
 
 local function makeRightSlider(labelText,min,max,current,suffix,order,callback)
     local wrap=Instance.new("Frame",RightScroll); wrap.Size=UDim2.new(1,0,0,0)
-    wrap.AutomaticSize=Enum.AutomaticSize.Y; wrap.BackgroundTransparency=1; wrap.BorderSizePixel=0
-    wrap.LayoutOrder=order or 0; makeList(wrap,Enum.FillDirection.Vertical,6)
-    local header=Instance.new("Frame",wrap); header.Size=UDim2.new(1,0,0,14); header.BackgroundTransparency=1; header.BorderSizePixel=0
-    local hl=Instance.new("UIListLayout",header); hl.FillDirection=Enum.FillDirection.Horizontal; hl.HorizontalAlignment=Enum.HorizontalAlignment.Left
-    local slLbl=Instance.new("TextLabel",header); slLbl.Size=UDim2.new(0.7,0,1,0)
-    slLbl.BackgroundTransparency=1; slLbl.Text=labelText; slLbl.TextColor3=C_MUTED()
-    slLbl.TextSize=fs(10); slLbl.Font=Enum.Font.Gotham; slLbl.TextXAlignment=Enum.TextXAlignment.Left
+    wrap.AutomaticSize=Enum.AutomaticSize.Y; wrap.BackgroundTransparency=1
+    wrap.BorderSizePixel=0; wrap.LayoutOrder=order or 0; makeList(wrap,Enum.FillDirection.Vertical,6)
+    local header=Instance.new("Frame",wrap); header.Size=UDim2.new(1,0,0,14)
+    header.BackgroundTransparency=1; header.BorderSizePixel=0
+    local hl=Instance.new("UIListLayout",header); hl.FillDirection=Enum.FillDirection.Horizontal
+    hl.HorizontalAlignment=Enum.HorizontalAlignment.Left
+    local lbl=Instance.new("TextLabel",header); lbl.Size=UDim2.new(0.7,0,1,0)
+    lbl.BackgroundTransparency=1; lbl.Text=labelText; lbl.TextColor3=C_MUTED
+    lbl.TextSize=fs(10); lbl.Font=Enum.Font.Gotham; lbl.TextXAlignment=Enum.TextXAlignment.Left
     local valLbl=Instance.new("TextLabel",header); valLbl.Size=UDim2.new(0.3,0,1,0)
     valLbl.BackgroundTransparency=1; valLbl.Text=tostring(current)..(suffix or "")
-    valLbl.TextColor3=C_TEXT(); valLbl.TextSize=fs(10); valLbl.Font=Enum.Font.GothamBold; valLbl.TextXAlignment=Enum.TextXAlignment.Right
-    local numWrap=Instance.new("Frame",wrap); numWrap.Size=UDim2.new(1,0,0,22); numWrap.BackgroundTransparency=1; numWrap.BorderSizePixel=0
+    valLbl.TextColor3=C_TEXT; valLbl.TextSize=fs(10); valLbl.Font=Enum.Font.GothamBold
+    valLbl.TextXAlignment=Enum.TextXAlignment.Right
+    -- Number input box alongside
+    local numWrap=Instance.new("Frame",wrap); numWrap.Size=UDim2.new(1,0,0,22)
+    numWrap.BackgroundTransparency=1; numWrap.BorderSizePixel=0
     local numBox=Instance.new("TextBox",numWrap); numBox.Size=UDim2.new(0,48,1,0)
-    numBox.Position=UDim2.new(1,-50,0,0); numBox.BackgroundColor3=C_CARD(); numBox.BorderSizePixel=0
-    numBox.Text=tostring(current); numBox.TextColor3=C_TEXT(); numBox.TextSize=fs(10)
-    numBox.Font=Enum.Font.GothamBold; numBox.TextXAlignment=Enum.TextXAlignment.Center; numBox.ClearTextOnFocus=false
-    makeRound(numBox,4); makeStroke(numBox,C_STROKE(),1)
+    numBox.Position=UDim2.new(1,-50,0,0)
+    numBox.BackgroundColor3=C_CARD; numBox.BorderSizePixel=0
+    numBox.Text=tostring(current); numBox.TextColor3=C_TEXT; numBox.TextSize=fs(10)
+    numBox.Font=Enum.Font.GothamBold; numBox.TextXAlignment=Enum.TextXAlignment.Center
+    numBox.ClearTextOnFocus=false
+    makeRound(numBox,4); makeStroke(numBox,C_STROKE,1)
+    numBox.FocusLost:Connect(function()
+        local v=tonumber(numBox.Text)
+        if v then
+            v=math.clamp(math.floor(v),min,max)
+            numBox.Text=tostring(v); valLbl.Text=tostring(v)..(suffix or "")
+            local rel=(v-min)/(max-min)
+            fill.Size=UDim2.new(rel,0,1,0); thumb.Position=UDim2.new(rel,-7,0,0)
+            if callback then callback(v) end
+        else
+            numBox.Text=valLbl.Text:gsub(suffix or "","")
+        end
+    end)
     local track=Instance.new("Frame",wrap); track.Size=UDim2.new(1,0,0,14)
-    track.BackgroundColor3=C_CARD(); track.BorderSizePixel=0; makeRound(track,7); makeStroke(track,C_STROKE(),1)
+    track.BackgroundColor3=C_CARD; track.BorderSizePixel=0; makeRound(track,7); makeStroke(track,C_STROKE,1)
     local fill=Instance.new("Frame",track); fill.Size=UDim2.new((current-min)/(max-min),0,1,0)
-    fill.BackgroundColor3=C_ACCENT(); fill.BorderSizePixel=0; makeRound(fill,7)
+    fill.BackgroundColor3=C_ACCENT; fill.BorderSizePixel=0; makeRound(fill,7)
     local thumb=Instance.new("Frame",track); thumb.Size=UDim2.new(0,14,0,14)
     thumb.Position=UDim2.new((current-min)/(max-min),-7,0,0)
     thumb.BackgroundColor3=Color3.fromRGB(255,255,255); thumb.BorderSizePixel=0; makeRound(thumb,7)
@@ -1220,14 +1436,6 @@ local function makeRightSlider(labelText,min,max,current,suffix,order,callback)
         valLbl.Text=tostring(val)..(suffix or ""); numBox.Text=tostring(val)
         if callback then callback(val) end
     end
-    numBox.FocusLost:Connect(function()
-        local v=tonumber(numBox.Text)
-        if v then
-            v=math.clamp(math.floor(v),min,max); numBox.Text=tostring(v); valLbl.Text=tostring(v)..(suffix or "")
-            local rel=(v-min)/(max-min); fill.Size=UDim2.new(rel,0,1,0); thumb.Position=UDim2.new(rel,-7,0,0)
-            if callback then callback(v) end
-        else numBox.Text=valLbl.Text:gsub(suffix or "","") end
-    end)
     thumb.InputBegan:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then slDrag=true end end)
     UIS.InputChanged:Connect(function(inp) if slDrag and inp.UserInputType==Enum.UserInputType.MouseMovement then updateSlider(inp.Position.X) end end)
     UIS.InputEnded:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then slDrag=false end end)
@@ -1237,25 +1445,28 @@ end
 
 local function makeRightKeybind(labelText,key,order)
     local card=Instance.new("Frame",RightScroll); card.Size=UDim2.new(1,0,0,30)
-    card.BackgroundColor3=C_CARD(); card.BorderSizePixel=0; card.LayoutOrder=order or 0
-    makeRound(card,6); makeStroke(card,C_STROKE(),1)
+    card.BackgroundColor3=C_CARD; card.BorderSizePixel=0; card.LayoutOrder=order or 0
+    makeRound(card,6); makeStroke(card,C_STROKE,1)
     local lbl=Instance.new("TextLabel",card); lbl.Size=UDim2.new(0.6,0,1,0)
     lbl.Position=UDim2.new(0,10,0,0); lbl.BackgroundTransparency=1
-    lbl.Text=labelText; lbl.TextColor3=C_MUTED(); lbl.TextSize=fs(10); lbl.Font=Enum.Font.Gotham; lbl.TextXAlignment=Enum.TextXAlignment.Left
+    lbl.Text=labelText; lbl.TextColor3=C_MUTED; lbl.TextSize=fs(10)
+    lbl.Font=Enum.Font.Gotham; lbl.TextXAlignment=Enum.TextXAlignment.Left
     local badge=Instance.new("TextLabel",card); badge.Size=UDim2.new(0,0,0,18)
     badge.AutomaticSize=Enum.AutomaticSize.X; badge.Position=UDim2.new(1,-14,0.5,-9)
-    badge.AnchorPoint=Vector2.new(1,0); badge.BackgroundColor3=C_PANEL()
-    badge.TextColor3=C_TEXT(); badge.Text=" "..key.." "; badge.TextSize=fs(10)
-    badge.Font=Enum.Font.GothamBold; badge.BorderSizePixel=0; makeRound(badge,4); makeStroke(badge,C_STROKE(),1)
+    badge.AnchorPoint=Vector2.new(1,0); badge.BackgroundColor3=C_PANEL
+    badge.TextColor3=C_TEXT; badge.Text=" "..key.." "; badge.TextSize=fs(10)
+    badge.Font=Enum.Font.GothamBold; badge.BorderSizePixel=0
+    makeRound(badge,4); makeStroke(badge,C_STROKE,1)
     return card,badge
 end
 
 -- =============================================
---// TAB MANAGEMENT
+--// TAB MANAGEMENT \\--
 -- =============================================
 local allSideItems={}
 local allTabFrames={}
 local currentTabName=""
+local sideItemBadges={} -- key->badge frame ref
 
 local function clearContent()
     for _,c in ipairs(Content:GetChildren()) do
@@ -1268,34 +1479,45 @@ end
 
 local function selectTab(name)
     if currentTabName==name then return end
-    currentTabName=name; clearContent(); BreadcrumbLabel.Text=name:upper()
+    currentTabName=name; clearContent()
+    -- Update breadcrumb
+    BreadcrumbLabel.Text=name:upper()
     for _,entry in ipairs(allSideItems) do
         local isActive=entry.name==name
         entry.accent.Visible=isActive
         entry.lbl.Font=isActive and Enum.Font.GothamBold or Enum.Font.GothamMedium
-        entry.icon.TextColor3=isActive and C_ACCENT() or C_MUTED()
-        TweenService:Create(entry.lbl,TweenInfo.new(0.12),{TextColor3=isActive and C_TEXT() or C_MUTED()}):Play()
-        if isActive then TweenService:Create(entry.item,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(22,30,48),BackgroundTransparency=0}):Play()
-        else TweenService:Create(entry.item,TweenInfo.new(0.12),{BackgroundTransparency=1}):Play() end
+        entry.icon.TextColor3=isActive and C_ACCENT or C_MUTED
+        TweenService:Create(entry.lbl,TweenInfo.new(0.12),{TextColor3=isActive and C_TEXT or C_MUTED}):Play()
+        if isActive then
+            TweenService:Create(entry.item,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(22,30,48),BackgroundTransparency=0}):Play()
+        else
+            TweenService:Create(entry.item,TweenInfo.new(0.12),{BackgroundTransparency=1}):Play()
+        end
     end
     if allTabFrames[name] then allTabFrames[name]() end
+    -- Rebuild quick panel whenever tab changes
     buildQuickPanel()
 end
 
-local function setSideItemBadge(name,visible)
+local function setSideItemBadge(name, visible)
     for _,entry in ipairs(allSideItems) do
-        if entry.name==name and entry.badge then entry.badge.Visible=visible end
+        if entry.name==name and entry.badge then
+            entry.badge.Visible=visible
+        end
     end
 end
 
 local function registerSideItem(parent,name,displayText,icon,order)
-    local item,accent,lbl,iconLbl,badge=makeSideItem(parent,displayText,icon,order,function() selectTab(name) end)
+    local item,accent,lbl,iconLbl,badge=makeSideItem(parent,displayText,icon,order,function()
+        selectTab(name)
+    end)
     table.insert(allSideItems,{name=name,item=item,accent=accent,lbl=lbl,icon=iconLbl,badge=badge})
     return item
 end
 
+-- Keyboard navigation for sidebar
 local sidebarFocusIdx=1
-UIS.InputBegan:Connect(function(inp,gp)
+UIS.InputBegan:Connect(function(inp, gp)
     if gp then return end
     if inp.KeyCode==Enum.KeyCode.Up then
         sidebarFocusIdx=math.max(1,sidebarFocusIdx-1)
@@ -1307,15 +1529,17 @@ UIS.InputBegan:Connect(function(inp,gp)
 end)
 
 -- =============================================
---// SIDEBAR STRUCTURE
+--// SIDEBAR STRUCTURE \\--
 -- =============================================
 local function sideSection(text,order)
     local f=Instance.new("Frame",SideScroll); f.Size=UDim2.new(1,0,0,24)
     f.BackgroundTransparency=1; f.BorderSizePixel=0; f.LayoutOrder=order
     local l=Instance.new("TextLabel",f); l.Size=UDim2.new(1,-14,1,0)
     l.Position=UDim2.new(0,14,0,0); l.BackgroundTransparency=1
-    l.Text=text:upper(); l.TextColor3=C_MUTED(); l.TextSize=fs(9); l.Font=Enum.Font.GothamBold; l.TextXAlignment=Enum.TextXAlignment.Left
+    l.Text=text:upper(); l.TextColor3=C_MUTED; l.TextSize=fs(9)
+    l.Font=Enum.Font.GothamBold; l.TextXAlignment=Enum.TextXAlignment.Left
 end
+
 sideSection("PINNED",-1)
 registerSideItem(SideScroll,"favorites","Favorites","★",0)
 sideSection("AUTOMATION",5)
@@ -1342,17 +1566,20 @@ registerSideItem(SideScroll,"notiflog", "Notif History", "🔔",35)
 registerSideItem(SideScroll,"settings", "Settings",      "⚙",36)
 registerSideItem(SideScroll,"credits",  "Credits",       "✨",37)
 
+-- =============================================
+--// SEARCH \\--
+-- =============================================
 SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     local q=SearchBox.Text:lower()
     for _,entry in ipairs(allSideItems) do
         local matches=q=="" or entry.name:lower():find(q,1,true) or entry.lbl.Text:lower():find(q,1,true)
-        TweenService:Create(entry.lbl,TweenInfo.new(0.1),{TextColor3=matches and (entry.accent.Visible and C_TEXT() or C_MUTED()) or Color3.fromRGB(40,44,60)}):Play()
-        TweenService:Create(entry.icon,TweenInfo.new(0.1),{TextColor3=matches and (entry.accent.Visible and C_ACCENT() or C_MUTED()) or Color3.fromRGB(40,44,60)}):Play()
+        TweenService:Create(entry.lbl,TweenInfo.new(0.1),{TextColor3=matches and (entry.accent.Visible and C_TEXT or C_MUTED) or Color3.fromRGB(40,44,60)}):Play()
+        TweenService:Create(entry.icon,TweenInfo.new(0.1),{TextColor3=matches and (entry.accent.Visible and C_ACCENT or C_MUTED) or Color3.fromRGB(40,44,60)}):Play()
     end
 end)
 
 -- =============================================
---// DRAGGING + SNAPPING
+--// DRAGGING + SNAPPING \\--
 -- =============================================
 do
     local dragging=false; local dragStart,startPos
@@ -1370,26 +1597,33 @@ do
     end)
     UIS.InputEnded:Connect(function(inp)
         if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-            if not dragging then return end; dragging=false; saveWindowState(Root.Position,Root.AbsoluteSize)
+            if not dragging then return end; dragging=false
+            saveWindowState(Root.Position,Root.AbsoluteSize)
             local vp=workspace.CurrentCamera.ViewportSize
             local ap=Root.AbsolutePosition; local as=Root.AbsoluteSize; local snap=40
             local nx,ny=ap.X,ap.Y
-            if ap.X<snap then nx=0 end; if ap.Y<snap then ny=0 end
+            if ap.X<snap then nx=0 end
+            if ap.Y<snap then ny=0 end
             if (ap.X+as.X)>(vp.X-snap) then nx=vp.X-as.X end
             if (ap.Y+as.Y)>(vp.Y-snap) then ny=vp.Y-as.Y end
-            if nx~=ap.X or ny~=ap.Y then TweenService:Create(Root,TweenInfo.new(0.18,Enum.EasingStyle.Quart),{Position=UDim2.new(0,nx,0,ny)}):Play() end
+            if nx~=ap.X or ny~=ap.Y then
+                TweenService:Create(Root,TweenInfo.new(0.18,Enum.EasingStyle.Quart),{Position=UDim2.new(0,nx,0,ny)}):Play()
+            end
         end
     end)
 end
 
 -- =============================================
---// WINDOW BUTTONS
+--// WINDOW BUTTONS \\--
 -- =============================================
 CloseBtn.MouseButton1Click:Connect(function()
     TweenService:Create(Root,TweenInfo.new(0.2,Enum.EasingStyle.Quart,Enum.EasingDirection.In),{Size=UDim2.new(0,Root.AbsoluteSize.X,0,0),BackgroundTransparency=1}):Play()
     task.wait(0.22); MainGui.Enabled=false
     Root.Size=UDim2.new(0,740,0,470); Root.BackgroundTransparency=0
-    if dimDesiredState then DimGui.Enabled=false end
+    -- FIX: when GUI closes, also hide dim if it's on
+    if dimDesiredState then
+        DimGui.Enabled=false
+    end
 end)
 
 do
@@ -1400,34 +1634,38 @@ do
     end)
 end
 
+-- Mini mode
 do
     local miniMode=false; local MiniOverlay=nil
     MiniBtn.MouseButton1Click:Connect(function()
         miniMode=not miniMode
         if miniMode then
             MainGui.Enabled=false
+            -- FIX: dim should also hide when going mini
             if dimDesiredState then DimGui.Enabled=false end
             MiniOverlay=Instance.new("ScreenGui"); MiniOverlay.Name="BLMini"
             MiniOverlay.ResetOnSpawn=false; MiniOverlay.DisplayOrder=1004
             MiniOverlay.IgnoreGuiInset=true; MiniOverlay.Parent=playerGui
             local pill=Instance.new("Frame",MiniOverlay); pill.Size=UDim2.new(0,220,0,56)
-            pill.Position=UDim2.new(0,10,0,10); pill.BackgroundColor3=C_SIDEBAR(); pill.BorderSizePixel=0; pill.Active=true
-            makeRound(pill,28); makeStroke(pill,C_STROKE(),1)
+            pill.Position=UDim2.new(0,10,0,10); pill.BackgroundColor3=C_SIDEBAR
+            pill.BorderSizePixel=0; pill.Active=true
+            makeRound(pill,28); makeStroke(pill,C_STROKE,1)
             local topAcc=Instance.new("Frame",pill); topAcc.Size=UDim2.new(1,0,0,3)
-            topAcc.BackgroundColor3=C_ACCENT(); topAcc.BorderSizePixel=0; makeRound(topAcc,28)
+            topAcc.BackgroundColor3=C_ACCENT; topAcc.BorderSizePixel=0; makeRound(topAcc,28)
             local ml1=Instance.new("TextLabel",pill); ml1.Size=UDim2.new(1,-8,0,18); ml1.Position=UDim2.new(0,12,0,8)
-            ml1.BackgroundTransparency=1; ml1.TextColor3=C_TEXT(); ml1.TextSize=fs(11)
+            ml1.BackgroundTransparency=1; ml1.TextColor3=C_TEXT; ml1.TextSize=fs(11)
             ml1.Font=Enum.Font.GothamBold; ml1.TextXAlignment=Enum.TextXAlignment.Left; ml1.Text="🥊 BOXING LEAGUE"
             local ml2=Instance.new("TextLabel",pill); ml2.Size=UDim2.new(1,-60,0,14); ml2.Position=UDim2.new(0,12,0,28)
-            ml2.BackgroundTransparency=1; ml2.TextColor3=C_MUTED(); ml2.TextSize=fs(10)
+            ml2.BackgroundTransparency=1; ml2.TextColor3=C_MUTED; ml2.TextSize=fs(10)
             ml2.Font=Enum.Font.GothamMedium; ml2.TextXAlignment=Enum.TextXAlignment.Left
             local expBtn=Instance.new("TextButton",pill); expBtn.Size=UDim2.new(0,26,0,26)
-            expBtn.Position=UDim2.new(1,-32,0.5,-13); expBtn.BackgroundColor3=C_ACCENT()
-            expBtn.Text="⊞"; expBtn.TextColor3=Color3.fromRGB(255,255,255); expBtn.TextSize=12
-            expBtn.Font=Enum.Font.GothamBold; expBtn.BorderSizePixel=0; makeRound(expBtn,6)
+            expBtn.Position=UDim2.new(1,-32,0.5,-13); expBtn.BackgroundColor3=C_ACCENT
+            expBtn.Text="⊞"; expBtn.TextColor3=Color3.fromRGB(255,255,255)
+            expBtn.TextSize=12; expBtn.Font=Enum.Font.GothamBold; expBtn.BorderSizePixel=0; makeRound(expBtn,6)
             expBtn.MouseButton1Click:Connect(function()
                 miniMode=false; if MiniOverlay then MiniOverlay:Destroy(); MiniOverlay=nil end
                 MainGui.Enabled=true
+                -- FIX: restore dim when re-opening
                 if dimDesiredState then DimGui.Enabled=true; DimFrame.Visible=true; DimFrame.BackgroundTransparency=0.55 end
             end)
             do
@@ -1437,7 +1675,8 @@ do
                 end)
                 UIS.InputChanged:Connect(function(inp)
                     if md and inp.UserInputType==Enum.UserInputType.MouseMovement then
-                        local d=inp.Position-ms; pill.Position=UDim2.new(mp.X.Scale,mp.X.Offset+d.X,mp.Y.Scale,mp.Y.Offset+d.Y)
+                        local d=inp.Position-ms
+                        pill.Position=UDim2.new(mp.X.Scale,mp.X.Offset+d.X,mp.Y.Scale,mp.Y.Offset+d.Y)
                     end
                 end)
                 UIS.InputEnded:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then md=false end end)
@@ -1454,53 +1693,65 @@ do
         else
             if MiniOverlay then MiniOverlay:Destroy(); MiniOverlay=nil end
             MainGui.Enabled=true
+            -- FIX: restore dim
             if dimDesiredState then DimGui.Enabled=true; DimFrame.Visible=true; DimFrame.BackgroundTransparency=0.55 end
         end
     end)
 end
 
+-- Toggle UI visibility (FIX: sync dim correctly)
 do
     local guiVisible=true
     UIS.InputBegan:Connect(function(inp,gp)
         if gp then return end
-        if inp.KeyCode==RayfieldKeybind.Key then
-            guiVisible=not guiVisible; MainGui.Enabled=guiVisible
+        if inp.KeyCode==RayfieldKeybindSettings.Key then
+            guiVisible=not guiVisible
+            MainGui.Enabled=guiVisible
+            -- FIX: Dim tracks actual visibility, not just the setting
             if dimDesiredState then
                 DimGui.Enabled=guiVisible
-                if guiVisible then DimFrame.Visible=true; DimFrame.BackgroundTransparency=0.55 else DimFrame.Visible=false end
+                if guiVisible then
+                    DimFrame.Visible=true
+                    DimFrame.BackgroundTransparency=0.55
+                else
+                    DimFrame.Visible=false
+                end
             end
         end
     end)
 end
 
 -- =============================================
---// KEYBIND CHEATSHEET
+--// KEYBIND CHEATSHEET \\--
 -- =============================================
 do
     local CheatGui=Instance.new("ScreenGui"); CheatGui.Name="BLCheat"; CheatGui.ResetOnSpawn=false
     CheatGui.DisplayOrder=1006; CheatGui.IgnoreGuiInset=true; CheatGui.Parent=playerGui; CheatGui.Enabled=false
     local cheatFrame=Instance.new("Frame",CheatGui); cheatFrame.Size=UDim2.new(0,260,0,0)
     cheatFrame.AutomaticSize=Enum.AutomaticSize.Y; cheatFrame.Position=UDim2.new(0.5,-130,0.5,-100)
-    cheatFrame.BackgroundColor3=C_PANEL(); cheatFrame.BorderSizePixel=0
-    makeRound(cheatFrame,10); makeStroke(cheatFrame,C_STROKE(),1); makePadding(cheatFrame,10,10,14,14); makeList(cheatFrame,Enum.FillDirection.Vertical,4)
+    cheatFrame.BackgroundColor3=C_PANEL; cheatFrame.BorderSizePixel=0
+    makeRound(cheatFrame,10); makeStroke(cheatFrame,C_STROKE,1)
+    makePadding(cheatFrame,10,10,14,14); makeList(cheatFrame,Enum.FillDirection.Vertical,4)
     local cheatTitle=Instance.new("TextLabel",cheatFrame); cheatTitle.Size=UDim2.new(1,0,0,18)
     cheatTitle.BackgroundTransparency=1; cheatTitle.Text="⌨  KEYBIND CHEATSHEET"
-    cheatTitle.TextColor3=C_ACCENT(); cheatTitle.TextSize=fs(11); cheatTitle.Font=Enum.Font.GothamBold; cheatTitle.TextXAlignment=Enum.TextXAlignment.Left
+    cheatTitle.TextColor3=C_ACCENT; cheatTitle.TextSize=fs(11); cheatTitle.Font=Enum.Font.GothamBold
+    cheatTitle.TextXAlignment=Enum.TextXAlignment.Left
     local function addCheatRow(l,r)
         local f=Instance.new("Frame",cheatFrame); f.Size=UDim2.new(1,0,0,22); f.BackgroundTransparency=1
         local ll=Instance.new("TextLabel",f); ll.Size=UDim2.new(0.6,0,1,0); ll.BackgroundTransparency=1
-        ll.Text=l; ll.TextColor3=C_MUTED(); ll.TextSize=fs(10); ll.Font=Enum.Font.Gotham; ll.TextXAlignment=Enum.TextXAlignment.Left
+        ll.Text=l; ll.TextColor3=C_MUTED; ll.TextSize=fs(10); ll.Font=Enum.Font.Gotham; ll.TextXAlignment=Enum.TextXAlignment.Left
         local rl=Instance.new("TextLabel",f); rl.Size=UDim2.new(0.4,0,1,0); rl.Position=UDim2.new(0.6,0,0,0)
-        rl.BackgroundTransparency=1; rl.Text="["..r.."]"; rl.TextColor3=C_TEXT()
+        rl.BackgroundTransparency=1; rl.Text="["..r.."]"; rl.TextColor3=C_TEXT
         rl.TextSize=fs(10); rl.Font=Enum.Font.GothamBold; rl.TextXAlignment=Enum.TextXAlignment.Right
     end
-    addCheatRow("Show / Hide UI",     RayfieldKeybind.Key.Name)
+    addCheatRow("Show / Hide UI",     RayfieldKeybindSettings.Key.Name)
     addCheatRow("Auto Clash Toggle",  ClashSettings.ClashKeybind.Name)
     addCheatRow("Camera Lock Toggle", CameraSettings.LockOnKeybind.Name)
     addCheatRow("Cheatsheet Toggle",  KeybindCheatsheetKey.Name)
     local cheatNote=Instance.new("TextLabel",cheatFrame); cheatNote.Size=UDim2.new(1,0,0,16)
     cheatNote.BackgroundTransparency=1; cheatNote.Text="Press ["..KeybindCheatsheetKey.Name.."] to dismiss"
-    cheatNote.TextColor3=C_MUTED(); cheatNote.TextSize=fs(9); cheatNote.Font=Enum.Font.Gotham; cheatNote.TextXAlignment=Enum.TextXAlignment.Left
+    cheatNote.TextColor3=C_MUTED; cheatNote.TextSize=fs(9); cheatNote.Font=Enum.Font.Gotham
+    cheatNote.TextXAlignment=Enum.TextXAlignment.Left
     local csVisible=false
     UIS.InputBegan:Connect(function(inp,gp)
         if gp then return end
@@ -1509,24 +1760,24 @@ do
 end
 
 -- =============================================
---// BAG HIGHLIGHT
+--// BAG HIGHLIGHT \\--
 -- =============================================
-clearBagHighlights = function()
+local function clearBagHighlights()
     for _,sel in ipairs(BagHighlightInstances) do pcall(function() sel:Destroy() end) end
     BagHighlightInstances={}
 end
-applyBagHighlight = function(boxName)
+local function applyBagHighlight(boxName)
     clearBagHighlights(); if not BagHighlightEnabled then return end
     pcall(function()
         local box=Machinery:FindFirstChild(boxName); if not box then return end
-        local sel=Instance.new("SelectionBox"); sel.Adornee=box; sel.Color3=C_ACCENT()
-        sel.LineThickness=0.06; sel.SurfaceTransparency=0.8; sel.SurfaceColor3=C_ACCENT(); sel.Parent=Workspace
+        local sel=Instance.new("SelectionBox"); sel.Adornee=box; sel.Color3=C_ACCENT
+        sel.LineThickness=0.06; sel.SurfaceTransparency=0.8; sel.SurfaceColor3=C_ACCENT; sel.Parent=Workspace
         table.insert(BagHighlightInstances,sel)
     end)
 end
 
 -- =============================================
---// AUTO CLASH
+--// AUTO CLASH \\--
 -- =============================================
 local function getZN()
     for _,gui in ipairs(playerGui:GetChildren()) do
@@ -1564,15 +1815,16 @@ local function exitUINavigation()
     end
     pcall(function() GuiService.SelectedObject=nil end)
 end
-
 local autoClashThread,alreadyExited=nil,false
-startAutoClash = function()
+local function startAutoClash()
     if autoClashThread then return end; alreadyExited=false
     autoClashThread=task.spawn(function()
         while ClashSettings.AutoClash do
             local ZN=getZN()
             if ZN then
-                local done=allButtonsDone(ZN); setSideItemBadge("clash",not done and ClashSettings.AutoClash)
+                -- Show badge on clash sidebar item when clash is ready
+                local done=allButtonsDone(ZN)
+                setSideItemBadge("clash", not done and ClashSettings.AutoClash)
                 if done then
                     if not alreadyExited then alreadyExited=true; task.wait(0.3); exitUINavigation(); Notify("Clash Complete ✅","All green.",3,C_GREEN) end; task.wait(0.1)
                 else
@@ -1582,12 +1834,16 @@ startAutoClash = function()
                         local btn=ZN:FindFirstChild("B"..i); if btn and not isButtonDone(btn) then focusButton(btn); clashButton(btn) end
                     end
                 end
-            else setSideItemBadge("clash",false); task.wait(0.1) end
+            else
+                setSideItemBadge("clash", false)
+                task.wait(0.1)
+            end
         end; autoClashThread=nil
     end)
 end
-stopAutoClash = function()
-    ClashSettings.AutoClash=false; autoClashThread=nil; setSideItemBadge("clash",false)
+local function stopAutoClash()
+    ClashSettings.AutoClash=false; autoClashThread=nil
+    setSideItemBadge("clash", false)
 end
 local function toggleAutoClash()
     ClashSettings.AutoClash=not ClashSettings.AutoClash
@@ -1597,55 +1853,38 @@ end
 UIS.InputBegan:Connect(function(inp,gp) if gp then return end; if inp.KeyCode==ClashSettings.ClashKeybind then toggleAutoClash() end end)
 
 -- =============================================
---// CAMERA  — FIX: moved into a module table to avoid register overflow
+--// CAMERA \\--
 -- =============================================
-local CamMod = {}
-
-function CamMod.freeze()
-    if CameraSettings.CurrentlyFrozen then return end
-    CameraSettings.CurrentlyFrozen=true; CameraSettings.FrozenCFrame=Camera.CFrame
-    Camera.CameraType=Enum.CameraType.Scriptable
+local function freezeCamera()
+    if CameraSettings.CurrentlyFrozen then return end; CameraSettings.CurrentlyFrozen=true
+    CameraSettings.FrozenCFrame=Camera.CFrame; Camera.CameraType=Enum.CameraType.Scriptable
     CameraSettings.RenderConnection=RunService.RenderStepped:Connect(function()
         if CameraSettings.CurrentlyFrozen and CameraSettings.FrozenCFrame then
             Camera.CameraType=Enum.CameraType.Scriptable; Camera.CFrame=CameraSettings.FrozenCFrame
         end
     end)
 end
-
-function CamMod.unfreeze()
-    if not CameraSettings.CurrentlyFrozen then return end
-    CameraSettings.CurrentlyFrozen=false; CameraSettings.FrozenCFrame=nil
+local function unfreezeCamera()
+    if not CameraSettings.CurrentlyFrozen then return end; CameraSettings.CurrentlyFrozen=false; CameraSettings.FrozenCFrame=nil
     if CameraSettings.RenderConnection then CameraSettings.RenderConnection:Disconnect(); CameraSettings.RenderConnection=nil end
     Camera.CameraType=Enum.CameraType.Custom
 end
-
-function CamMod.isLockedOn()
+local function isLockedOn()
     local s=Camera.CameraSubject; if not s then return false end
-    local c=Player.Character; if not c then return false end
-    return not(s:IsDescendantOf(c) or s==c)
+    local c=Player.Character; if not c then return false end; return not(s:IsDescendantOf(c) or s==c)
 end
-
-function CamMod.startWatcher()
+local function startLockOnWatcher()
     if CameraSettings.SubjectConnection then return end
     CameraSettings.SubjectConnection=Camera:GetPropertyChangedSignal("CameraSubject"):Connect(function()
         if not CameraSettings.BrokenCamera then return end
-        if CamMod.isLockedOn() then CamMod.freeze(); Notify("Locked On — Frozen","Camera held.",2,C_ACCENT())
-        else CamMod.unfreeze(); Notify("Lock Off — Restored","Normal camera.",2,C_MUTED()) end
+        if isLockedOn() then freezeCamera(); Notify("Locked On — Frozen","Camera held.",2,C_ACCENT)
+        else unfreezeCamera(); Notify("Lock Off — Restored","Normal camera.",2,C_MUTED) end
     end)
 end
-
-function CamMod.stopWatcher()
+local function stopLockOnWatcher()
     if CameraSettings.SubjectConnection then CameraSettings.SubjectConnection:Disconnect(); CameraSettings.SubjectConnection=nil end
-    CamMod.unfreeze()
+    unfreezeCamera()
 end
-
--- Keep original names for backwards compat inside tab builders
-local freezeCamera        = function() CamMod.freeze() end
-local unfreezeCamera      = function() CamMod.unfreeze() end
-local isLockedOn          = function() return CamMod.isLockedOn() end
-local startLockOnWatcher  = function() CamMod.startWatcher() end
-local stopLockOnWatcher   = function() CamMod.stopWatcher() end
-
 UIS.InputBegan:Connect(function(inp,gp)
     if gp then return end; if not CameraSettings.BrokenCamera then return end
     if inp.KeyCode==CameraSettings.LockOnKeybind then
@@ -1654,23 +1893,21 @@ UIS.InputBegan:Connect(function(inp,gp)
 end)
 
 -- =============================================
---// ANTI AFK
+--// ANTI AFK \\--
 -- =============================================
-local afkThread=nil
-startAFK = function()
-    if afkThread then return end; AntiAFK.Enabled=true
-    afkThread=task.spawn(function()
-        while AntiAFK.Enabled do
-            pcall(function() VirtualUser:CaptureController() end)
-            pcall(function() VirtualUser:ClickButton2(Vector2.new()) end)
-            task.wait(15)
-        end; afkThread=nil
-    end)
+local afkEnabled=false; local afkThread=nil
+local function afkLoop()
+    while afkEnabled do
+        pcall(function() VirtualUser:CaptureController() end)
+        pcall(function() VirtualUser:ClickButton2(Vector2.new()) end)
+        task.wait(15)
+    end
 end
-stopAFK = function() AntiAFK.Enabled=false; afkThread=nil end
+local function startAFK() if afkThread then return end; afkThread=task.spawn(afkLoop) end
+local function stopAFK() afkEnabled=false; afkThread=nil end
 
 -- =============================================
---// AUTO REJOIN
+--// AUTO REJOIN \\--
 -- =============================================
 local function doRejoin()
     pcall(function()
@@ -1684,7 +1921,7 @@ task.spawn(function()
     pcall(function()
         local joinData=Player:GetJoinData(); local td=joinData and joinData.TeleportData
         if td and td.autoLoad and td.scriptUrl and td.scriptUrl~="" then
-            task.wait(3); Notify("Auto Rejoin — Reloading","Reloading after rejoin...",4,C_ACCENT()); task.wait(1)
+            task.wait(3); Notify("Auto Rejoin — Reloading","Reloading after rejoin...",4,C_ACCENT); task.wait(1)
             pcall(function() loadstring(game:HttpGetAsync(td.scriptUrl))() end)
         end
     end)
@@ -1704,12 +1941,12 @@ local function stopAutoRejoin()
 end
 
 -- =============================================
---// AUTO RECONNECT
+--// AUTO RECONNECT \\--
 -- =============================================
 local reconnectFired=false
 local function doReconnect(reason)
     if not AutoReconnect.Enabled or reconnectFired then return end; reconnectFired=true
-    Notify("Auto Reconnect","Detected: "..tostring(reason)..". Rejoining in "..AutoReconnect.Delay.."s...",AutoReconnect.Delay+1,C_ACCENT())
+    Notify("Auto Reconnect","Detected: "..tostring(reason)..". Rejoining in "..AutoReconnect.Delay.."s...",AutoReconnect.Delay+1,C_ACCENT)
     task.wait(AutoReconnect.Delay)
     pcall(function()
         local opts=Instance.new("TeleportOptions")
@@ -1751,33 +1988,30 @@ end
 local function stopAutoReconnect()
     AutoReconnect.Enabled=false
     if AutoReconnect.CoreGuiConnection then AutoReconnect.CoreGuiConnection:Disconnect(); AutoReconnect.CoreGuiConnection=nil end
-    if AutoReconnect.NetworkConnection  then AutoReconnect.NetworkConnection:Disconnect();  AutoReconnect.NetworkConnection=nil end
-    if AutoReconnect.KickConnection     then AutoReconnect.KickConnection:Disconnect();     AutoReconnect.KickConnection=nil end
+    if AutoReconnect.NetworkConnection then AutoReconnect.NetworkConnection:Disconnect(); AutoReconnect.NetworkConnection=nil end
+    if AutoReconnect.KickConnection then AutoReconnect.KickConnection:Disconnect(); AutoReconnect.KickConnection=nil end
 end
 
 -- =============================================
---// FPS BOOST — stored in a table to save locals
+--// FPS BOOST \\--
 -- =============================================
-local FpsMod = {
-    Applied=false, DescConnection=nil,
-    Parts={}, Meshes={}, Decals={}, Effects={}, Lighting={}, Terrain={}
-}
+local FpsSnapshot={Applied=false,DescConnection=nil,Parts={},Meshes={},Decals={},Effects={},Lighting={},Terrain={}}
 local function takeSnapshot()
-    FpsMod.Parts={}; FpsMod.Meshes={}; FpsMod.Decals={}; FpsMod.Effects={}
+    FpsSnapshot.Parts={}; FpsSnapshot.Meshes={}; FpsSnapshot.Decals={}; FpsSnapshot.Effects={}
     for _,v in next,Workspace:GetDescendants() do pcall(function()
         if v:IsA("BasePart") and not v:IsA("MeshPart") then
-            table.insert(FpsMod.Parts,{inst=v,CastShadow=v.CastShadow,Material=v.Material,Reflectance=v.Reflectance,MaterialVariant=v.MaterialVariant})
+            table.insert(FpsSnapshot.Parts,{inst=v,CastShadow=v.CastShadow,Material=v.Material,Reflectance=v.Reflectance,MaterialVariant=v.MaterialVariant})
         elseif v:IsA("MeshPart") then
-            table.insert(FpsMod.Meshes,{inst=v,CastShadow=v.CastShadow,DoubleSided=v.DoubleSided,RenderFidelity=v.RenderFidelity,TextureID=v.TextureID})
+            table.insert(FpsSnapshot.Meshes,{inst=v,CastShadow=v.CastShadow,DoubleSided=v.DoubleSided,RenderFidelity=v.RenderFidelity,TextureID=v.TextureID})
         elseif v:IsA("Decal") or v:IsA("Texture") then
-            table.insert(FpsMod.Decals,{inst=v,Transparency=v.Transparency})
+            table.insert(FpsSnapshot.Decals,{inst=v,Transparency=v.Transparency})
         elseif v:IsA("Fire") or v:IsA("SpotLight") or v:IsA("Smoke") or v:IsA("Sparkles") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
-            table.insert(FpsMod.Effects,{inst=v,Enabled=v.Enabled})
+            table.insert(FpsSnapshot.Effects,{inst=v,Enabled=v.Enabled})
         end
     end) end
-    local L=game:GetService("Lighting"); FpsMod.Lighting={GlobalShadows=L.GlobalShadows,FogEnd=L.FogEnd,Brightness=L.Brightness}
+    local L=game:GetService("Lighting"); FpsSnapshot.Lighting={GlobalShadows=L.GlobalShadows,FogEnd=L.FogEnd,Brightness=L.Brightness}
     local T2=Workspace:FindFirstChildOfClass("Terrain")
-    if T2 then FpsMod.Terrain={WaterReflectance=T2.WaterReflectance,WaterTransparency=T2.WaterTransparency,WaterWaveSize=T2.WaterWaveSize,WaterWaveSpeed=T2.WaterWaveSpeed} end
+    if T2 then FpsSnapshot.Terrain={WaterReflectance=T2.WaterReflectance,WaterTransparency=T2.WaterTransparency,WaterWaveSize=T2.WaterWaveSize,WaterWaveSpeed=T2.WaterWaveSpeed} end
 end
 local function stripDescendant(v)
     pcall(function()
@@ -1796,9 +2030,9 @@ local function stripDescendant(v)
 end
 
 -- =============================================
---// NOCLIP
+--// NOCLIP \\--
 -- =============================================
-setNoclip = function(state)
+local function setNoclip(state)
     if state then
         NoclipSettings.Connection=RunService.Stepped:Connect(function()
             local char=Player.Character; if not char then return end
@@ -1814,7 +2048,7 @@ setNoclip = function(state)
 end
 
 -- =============================================
---// DEX FARM
+--// DEX FARM \\--
 -- =============================================
 local function dexSpace() GymUse:FireServer("Yeaichangedit") end
 local function dexM1()    GymUse:FireServer("CL") end
@@ -1835,43 +2069,48 @@ local function dexGetNumbers()
 end
 
 -- =============================================
---// THEME FULL REFRESH
+--// THEME FULL REFRESH \\--
 -- =============================================
 local function fullRefreshTheme()
-    Root.BackgroundColor3=C_BG()
-    Topbar.BackgroundColor3=C_SIDEBAR(); TFill.BackgroundColor3=C_SIDEBAR(); TDiv.BackgroundColor3=C_STROKE()
-    Sidebar.BackgroundColor3=C_SIDEBAR(); Sidebar.BackgroundTransparency=T.SidebarAlpha
-    SidebarFill.BackgroundColor3=C_SIDEBAR(); SidebarFill.BackgroundTransparency=T.SidebarAlpha; SideDiv.BackgroundColor3=C_STROKE()
-    RightPanel.BackgroundColor3=C_SIDEBAR(); RightPanel.BackgroundTransparency=T.SidebarAlpha
-    RightFill.BackgroundColor3=C_SIDEBAR(); RightFill.BackgroundTransparency=T.SidebarAlpha; RightDiv.BackgroundColor3=C_STROKE()
-    StatusBar.BackgroundColor3=C_SIDEBAR(); SBFill.BackgroundColor3=C_SIDEBAR(); SBDiv.BackgroundColor3=C_STROKE()
-    LogoLabel.TextColor3=C_TEXT(); ByLabel.TextColor3=C_ACCENT()
-    SearchFrame.BackgroundColor3=C_CARD(); SearchBox.TextColor3=C_TEXT(); SearchBox.PlaceholderColor3=C_MUTED()
-    TooltipFrame.BackgroundColor3=C_PANEL(); TooltipLabel.TextColor3=C_TEXT()
-    BreadcrumbLabel.TextColor3=C_MUTED()
+    Root.BackgroundColor3=C_BG
+    Topbar.BackgroundColor3=C_SIDEBAR; TFill.BackgroundColor3=C_SIDEBAR; TDiv.BackgroundColor3=C_STROKE
+    Sidebar.BackgroundColor3=C_SIDEBAR; Sidebar.BackgroundTransparency=T.SidebarAlpha
+    SidebarFill.BackgroundColor3=C_SIDEBAR; SidebarFill.BackgroundTransparency=T.SidebarAlpha; SideDiv.BackgroundColor3=C_STROKE
+    RightPanel.BackgroundColor3=C_SIDEBAR; RightPanel.BackgroundTransparency=T.SidebarAlpha
+    RightFill.BackgroundColor3=C_SIDEBAR; RightFill.BackgroundTransparency=T.SidebarAlpha; RightDiv.BackgroundColor3=C_STROKE
+    StatusBar.BackgroundColor3=C_SIDEBAR; SBFill.BackgroundColor3=C_SIDEBAR; SBDiv.BackgroundColor3=C_STROKE
+    LogoLabel.TextColor3=C_TEXT; ByLabel.TextColor3=C_ACCENT
+    SearchFrame.BackgroundColor3=C_CARD; SearchBox.TextColor3=C_TEXT; SearchBox.PlaceholderColor3=C_MUTED
+    TooltipFrame.BackgroundColor3=C_PANEL; TooltipLabel.TextColor3=C_TEXT
+    BreadcrumbLabel.TextColor3=C_MUTED
 end
 
 -- =============================================
---// TAB BUILDERS — stored in allTabFrames table
+--// TAB DEFINITIONS \\--
 -- =============================================
+local function buildTabs()
 
-allTabFrames["favorites"] = function()
+-- FAVORITES
+allTabFrames["favorites"]=function()
     makeSectionLabel(Content,"Starred Features",0)
     local hasFavs=false
     for k,_ in pairs(Favorites) do if Favorites[k] then hasFavs=true; break end end
     if not hasFavs then
-        local card=makeCard(Content,1); local _,lbl,div=makeFeatureRow(card,"No favorites yet — star any toggle or button",0)
-        lbl.TextColor3=C_MUTED(); lbl.Font=Enum.Font.Gotham; div:Destroy(); return
+        local card=makeCard(Content,1)
+        local _,lbl,div=makeFeatureRow(card,"No favorites yet — star any toggle or button",0)
+        lbl.TextColor3=C_MUTED; lbl.Font=Enum.Font.Gotham; div:Destroy(); return
     end
     local card=makeCard(Content,1); local i=0
     local favNames={dexgrind="Dex Farm",autoclash="Auto Clash",brokencamera="Broken Camera",antiafk="Anti AFK",autorejoin="Auto Rejoin",autoreconnect="Auto Reconnect",fly="Fly",noclip="Noclip",fpsboost="FPS Boost",baghighlight="Bag Highlight"}
     for k,_ in pairs(Favorites) do
         if Favorites[k] then i=i+1; makeButtonRow(card,favNames[k] or k,i,function() selectTab(k) end) end
     end
-    makeRightSection("Quick Access",0); makeRightStatus("Tap any starred item",false,1)
+    makeRightSection("Quick Access",0)
+    local _,_,_ = makeRightStatus("Tap any starred item",false,1)
 end
 
-allTabFrames["dex"] = function()
+-- DEX FARM
+allTabFrames["dex"]=function()
     makeSectionLabel(Content,"Select Bag",0)
     local bagCard=makeCard(Content,1)
     local function refreshBagCard()
@@ -1879,8 +2118,8 @@ allTabFrames["dex"] = function()
         for i,boxName in ipairs({"BOX1","BOX2","BOX3"}) do
             local row,lbl,div=makeFeatureRow(bagCard,boxName,i); if i==3 then div:Destroy() end
             local dot=Instance.new("Frame",row); dot.Size=UDim2.new(0,7,0,7)
-            dot.Position=UDim2.new(0,26,0.5,-3.5); dot.BackgroundColor3=dexSelectedBox==boxName and C_GREEN or C_MUTED(); dot.BorderSizePixel=0; makeRound(dot,4)
-            lbl.Position=UDim2.new(0,40,0,0); lbl.Size=UDim2.new(1,-60,1,0)
+            dot.Position=UDim2.new(0,26,0.5,-3.5); dot.BackgroundColor3=dexSelectedBox==boxName and C_GREEN or C_MUTED
+            dot.BorderSizePixel=0; makeRound(dot,4); lbl.Position=UDim2.new(0,40,0,0); lbl.Size=UDim2.new(1,-60,1,0)
             if dexSelectedBox==boxName then
                 local pill=makePill(row,"Active",true); pill.AnchorPoint=Vector2.new(1,0.5)
                 pill.Position=UDim2.new(1,-10,0.5,-9); pill.AutomaticSize=Enum.AutomaticSize.X; pill.Size=UDim2.new(0,0,0,18)
@@ -1890,7 +2129,7 @@ allTabFrames["dex"] = function()
             hitbox.MouseButton1Click:Connect(function()
                 dexSelectedBox=boxName; refreshBagCard()
                 if BagHighlightEnabled then applyBagHighlight(boxName) end
-                Notify("Bag Selected",boxName.." is now active.",2,C_ACCENT())
+                Notify("Bag Selected",boxName.." is now active.",2,C_ACCENT)
             end)
         end
     end
@@ -1900,88 +2139,105 @@ allTabFrames["dex"] = function()
     makeToggleRow(ctrlCard,"Bag Highlight",0,BagHighlightEnabled,function(val)
         BagHighlightEnabled=val
         if val then applyBagHighlight(dexSelectedBox); Notify("Bag Highlight ON","Bag outlined.",2,C_GREEN)
-        else clearBagHighlights(); Notify("Bag Highlight OFF","Removed.",2,C_MUTED()) end
+        else clearBagHighlights(); Notify("Bag Highlight OFF","Removed.",2,C_MUTED) end
     end,"Outline the selected bag in the world","baghighlight")
+
+    -- Status row
     local statusRow=Instance.new("Frame",ctrlCard); statusRow.Size=UDim2.new(1,0,0,36)
     statusRow.BackgroundTransparency=1; statusRow.BorderSizePixel=0; statusRow.LayoutOrder=1
     local statusDot=Instance.new("Frame",statusRow); statusDot.Size=UDim2.new(0,7,0,7)
-    statusDot.Position=UDim2.new(0,12,0.5,-3.5); statusDot.BackgroundColor3=C_MUTED(); statusDot.BorderSizePixel=0; makeRound(statusDot,4)
+    statusDot.Position=UDim2.new(0,12,0.5,-3.5); statusDot.BackgroundColor3=C_MUTED; statusDot.BorderSizePixel=0; makeRound(statusDot,4)
     local statusLbl=Instance.new("TextLabel",statusRow); statusLbl.Size=UDim2.new(1,-80,1,0)
     statusLbl.Position=UDim2.new(0,26,0,0); statusLbl.BackgroundTransparency=1
-    statusLbl.Text="Idle — not grinding"; statusLbl.TextColor3=C_MUTED(); statusLbl.TextSize=fs(11)
+    statusLbl.Text="Idle — not grinding"; statusLbl.TextColor3=C_MUTED; statusLbl.TextSize=fs(11)
     statusLbl.Font=Enum.Font.GothamMedium; statusLbl.TextXAlignment=Enum.TextXAlignment.Left
     local grindPill=makePill(statusRow,"Idle",false); grindPill.AnchorPoint=Vector2.new(1,0.5)
     grindPill.Position=UDim2.new(1,-10,0.5,-9); grindPill.AutomaticSize=Enum.AutomaticSize.X; grindPill.Size=UDim2.new(0,0,0,18)
+
+    -- Progress bar under status row
     local progTrack=Instance.new("Frame",ctrlCard); progTrack.Size=UDim2.new(1,-24,0,4)
-    progTrack.Position=UDim2.new(0,12,0,0); progTrack.BackgroundColor3=C_STROKE(); progTrack.BorderSizePixel=0; makeRound(progTrack,2); progTrack.LayoutOrder=2
+    progTrack.Position=UDim2.new(0,12,0,0); progTrack.BackgroundColor3=C_STROKE
+    progTrack.BorderSizePixel=0; makeRound(progTrack,2); progTrack.LayoutOrder=2
     local progFill=Instance.new("Frame",progTrack); progFill.Size=UDim2.new(0,0,1,0)
-    progFill.BackgroundColor3=C_ACCENT(); progFill.BorderSizePixel=0; makeRound(progFill,2)
+    progFill.BackgroundColor3=C_ACCENT; progFill.BorderSizePixel=0; makeRound(progFill,2)
+
     local grindBtn=Instance.new("TextButton",Content)
-    grindBtn.Size=UDim2.new(1,0,0,36); grindBtn.BackgroundColor3=C_ACCENT()
-    grindBtn.Text="▶  START GRIND"; grindBtn.TextColor3=C_TEXT(); grindBtn.TextSize=fs(12)
+    grindBtn.Size=UDim2.new(1,0,0,36); grindBtn.BackgroundColor3=C_ACCENT
+    grindBtn.Text="▶  START GRIND"; grindBtn.TextColor3=C_TEXT; grindBtn.TextSize=fs(12)
     grindBtn.Font=Enum.Font.GothamBold; grindBtn.BorderSizePixel=0; grindBtn.LayoutOrder=4
-    makeRound(grindBtn,8); makeStroke(grindBtn,C_ACCENT_DK(),1)
-    grindBtn.MouseEnter:Connect(function() if not dexGrindActive then TweenService:Create(grindBtn,TweenInfo.new(0.12),{BackgroundColor3=C_ACCENT_DK()}):Play() end end)
-    grindBtn.MouseLeave:Connect(function() if not dexGrindActive then TweenService:Create(grindBtn,TweenInfo.new(0.12),{BackgroundColor3=C_ACCENT()}):Play() end end)
+    makeRound(grindBtn,8); makeStroke(grindBtn,C_ACCENT_DK,1)
+    grindBtn.MouseEnter:Connect(function() if not dexGrindActive then TweenService:Create(grindBtn,TweenInfo.new(0.12),{BackgroundColor3=C_ACCENT_DK}):Play() end end)
+    grindBtn.MouseLeave:Connect(function() if not dexGrindActive then TweenService:Create(grindBtn,TweenInfo.new(0.12),{BackgroundColor3=C_ACCENT}):Play() end end)
+
     grindBtn.MouseButton1Click:Connect(function()
         dexGrindActive=not dexGrindActive
         if dexGrindActive then
-            grindBtn.Text="⏹  STOP GRIND"; TweenService:Create(grindBtn,TweenInfo.new(0.2),{BackgroundColor3=C_RED}):Play()
+            grindBtn.Text="⏹  STOP GRIND"
+            TweenService:Create(grindBtn,TweenInfo.new(0.2),{BackgroundColor3=C_RED}):Play()
             statusDot.BackgroundColor3=C_GREEN; statusLbl.Text="Grinding "..dexSelectedBox; statusLbl.TextColor3=C_GREEN
             grindPill.Text=" Running "; grindPill.TextColor3=C_GREEN; grindPill.BackgroundColor3=Color3.fromRGB(20,60,35)
             if BagHighlightEnabled then applyBagHighlight(dexSelectedBox) end
             Notify("Dex Farm Started","Grinding "..dexSelectedBox.."...",3,C_GREEN)
             task.spawn(function()
                 while dexGrindActive do
-                    local current,goal=dexGetNumbers(); dexCurrentVal=current; dexGoalVal=goal or 0
+                    local current,goal=dexGetNumbers()
+                    dexCurrentVal=current; dexGoalVal=goal or 0
                     if not goal or goal<=0 then statusLbl.Text="Waiting for target..."; task.wait(1)
                     elseif current>=goal then
                         dexGrindActive=false; grindBtn.Text="▶  START GRIND"
-                        TweenService:Create(grindBtn,TweenInfo.new(0.2),{BackgroundColor3=C_ACCENT()}):Play()
+                        TweenService:Create(grindBtn,TweenInfo.new(0.2),{BackgroundColor3=C_ACCENT}):Play()
                         statusDot.BackgroundColor3=C_GREEN; statusLbl.Text="✅ Goal reached!"; statusLbl.TextColor3=C_GREEN
                         grindPill.Text=" Done "; Notify("Goal Reached!",dexSelectedBox.." complete.",4,C_GREEN)
-                        TweenService:Create(progFill,TweenInfo.new(0.3),{Size=UDim2.new(1,0,1,0)}):Play(); break
+                        TweenService:Create(progFill,TweenInfo.new(0.3),{Size=UDim2.new(1,0,1,0)}):Play()
+                        break
                     else
+                        -- Update progress bar
                         local pct=math.clamp(current/goal,0,1)
                         TweenService:Create(progFill,TweenInfo.new(0.3),{Size=UDim2.new(pct,0,1,0)}):Play()
                         local needed=(goal-current)//100
                         if needed>0 then dexSpace(); task.wait(0.75) else dexM1(); task.wait(0.10) end
-                        local cur2,_=dexGetNumbers(); dexCurrentVal=cur2
+                        local cur2,_=dexGetNumbers()
+                        dexCurrentVal=cur2
                         if goal and goal>0 then statusLbl.Text=string.format("Grinding %s — %d / %d",dexSelectedBox,cur2,goal) end
                     end
                 end
             end)
         else
-            grindBtn.Text="▶  START GRIND"; TweenService:Create(grindBtn,TweenInfo.new(0.2),{BackgroundColor3=C_ACCENT()}):Play()
-            statusDot.BackgroundColor3=C_MUTED(); statusLbl.Text="Idle — not grinding"; statusLbl.TextColor3=C_MUTED()
-            grindPill.Text=" Idle "; grindPill.TextColor3=C_MUTED(); grindPill.BackgroundColor3=Color3.fromRGB(35,35,45)
+            grindBtn.Text="▶  START GRIND"
+            TweenService:Create(grindBtn,TweenInfo.new(0.2),{BackgroundColor3=C_ACCENT}):Play()
+            statusDot.BackgroundColor3=C_MUTED; statusLbl.Text="Idle — not grinding"; statusLbl.TextColor3=C_MUTED
+            grindPill.Text=" Idle "; grindPill.TextColor3=C_MUTED; grindPill.BackgroundColor3=Color3.fromRGB(35,35,45)
             TweenService:Create(progFill,TweenInfo.new(0.3),{Size=UDim2.new(0,0,1,0)}):Play()
-            Notify("Dex Farm Stopped","Grind halted.",2,C_MUTED())
+            Notify("Dex Farm Stopped","Grind halted.",2,C_MUTED)
         end
     end)
+
     makeSectionLabel(Content,"Info",5)
     local infoCard=makeCard(Content,6)
-    local _,l1=makeFeatureRow(infoCard,"Reads orange goal number from bag TV",0)
-    local _,l2=makeFeatureRow(infoCard,"Heavy hits (×100) then light hits to finish",1)
+    local _,l1,_=makeFeatureRow(infoCard,"Reads orange goal number from bag TV",0)
+    local _,l2,_=makeFeatureRow(infoCard,"Heavy hits (×100) then light hits to finish",1)
     local _,l3,d3=makeFeatureRow(infoCard,"Stops automatically when target reached",2); d3:Destroy()
-    for _,l in ipairs({l1,l2,l3}) do l.TextColor3=C_MUTED(); l.Font=Enum.Font.Gotham end
+    for _,l in ipairs({l1,l2,l3}) do l.TextColor3=C_MUTED; l.Font=Enum.Font.Gotham end
+
     makeRightSection("Bag Settings",0)
     makeRightDropdown("Target Bag",{"BOX1","BOX2","BOX3"},dexSelectedBox,1,function(opt)
         dexSelectedBox=opt; if BagHighlightEnabled then applyBagHighlight(opt) end
     end)
     makeRightSection("Overlay",5); makeButtonRow(makeCard(RightScroll,6),"Spawn Dex Overlay",0,function() spawnDexOverlay(); Notify("Dex Overlay","Spawned.",2,C_GREEN) end)
     makeRightSection("Session",10)
-    local tc=Instance.new("Frame",RightScroll); tc.Size=UDim2.new(1,0,0,28); tc.BackgroundColor3=C_CARD()
-    tc.BorderSizePixel=0; tc.LayoutOrder=11; makeRound(tc,6); makeStroke(tc,C_STROKE(),1)
+    local tc=Instance.new("Frame",RightScroll); tc.Size=UDim2.new(1,0,0,28); tc.BackgroundColor3=C_CARD
+    tc.BorderSizePixel=0; tc.LayoutOrder=11; makeRound(tc,6); makeStroke(tc,C_STROKE,1)
     local tl=Instance.new("TextLabel",tc); tl.Size=UDim2.new(1,-10,1,0); tl.Position=UDim2.new(0,10,0,0)
-    tl.BackgroundTransparency=1; tl.Text="⏱ "..getSessionTime(); tl.TextColor3=C_MUTED(); tl.TextSize=fs(10); tl.Font=Enum.Font.GothamMedium; tl.TextXAlignment=Enum.TextXAlignment.Left
+    tl.BackgroundTransparency=1; tl.Text="⏱ "..getSessionTime(); tl.TextColor3=C_MUTED
+    tl.TextSize=fs(10); tl.Font=Enum.Font.GothamMedium; tl.TextXAlignment=Enum.TextXAlignment.Left
     RunService.Heartbeat:Connect(function() if tl and tl.Parent then tl.Text="⏱ "..getSessionTime() end end)
 end
 
-allTabFrames["clash"] = function()
+-- AUTO CLASH
+allTabFrames["clash"]=function()
     makeSectionLabel(Content,"Automation",0)
     local autoCard=makeCard(Content,1)
-    makeToggleRow(autoCard,"Auto Clash",0,ClashSettings.AutoClash,function(val)
+    local _,setClash=makeToggleRow(autoCard,"Auto Clash",0,ClashSettings.AutoClash,function(val)
         ClashSettings.AutoClash=val; if val then startAutoClash() else stopAutoClash() end
     end,"Auto-click all clash buttons until they turn green","autoclash")
     makeToggleRow(autoCard,"Highlight Button on Select",1,true,function(val) ClashSettings.HighlightOnSelect=val end)
@@ -1991,22 +2247,20 @@ allTabFrames["clash"] = function()
         local ZN=getZN(); if not ZN then Notify("Not In Clash","ZN not found.",2,C_RED); return end
         for i=1,4 do local btn=ZN:FindFirstChild("B"..i); if btn and not isButtonDone(btn) then task.spawn(clashButton,btn) end end
     end)
-    for i=1,4 do
-        makeButtonRow(manCard,"Clash B"..i.." Once",i,function()
-            local ZN=getZN(); if not ZN then Notify("Not In Clash","ZN not found.",2,C_RED); return end
-            local btn=ZN:FindFirstChild("B"..i)
-            if btn and not isButtonDone(btn) then task.spawn(clashButton,btn) else Notify("B"..i.." Done","Already at 0.",2,C_MUTED()) end
-        end)
-    end
+    for i=1,4 do makeButtonRow(manCard,"Clash B"..i.." Once",i,function()
+        local ZN=getZN(); if not ZN then Notify("Not In Clash","ZN not found.",2,C_RED); return end
+        local btn=ZN:FindFirstChild("B"..i)
+        if btn and not isButtonDone(btn) then task.spawn(clashButton,btn) else Notify("B"..i.." Done","Already at 0.",2,C_MUTED) end
+    end) end
     makeButtonRow(manCard,"Check Clash Status",6,function()
         local ZN=getZN(); if not ZN then Notify("ZN Not Found","No active clash.",2,C_RED); return end
         local lines={}; for i=1,4 do local btn=ZN:FindFirstChild("B"..i); if btn then local val=getButtonValue(btn); table.insert(lines,"B"..i..": "..(val==nil and "?" or (val<=0 and "✅" or tostring(val)))) end end
-        Notify("Clash Status",table.concat(lines," | "),5,C_ACCENT())
+        Notify("Clash Status",table.concat(lines," | "),5,C_ACCENT)
     end)
-    makeButtonRow(manCard,"Exit UI Navigation",7,function() exitUINavigation(); Notify("Done","Pressed \\ to exit.",2,C_MUTED()) end)
+    makeButtonRow(manCard,"Exit UI Navigation",7,function() exitUINavigation(); Notify("Done","Pressed \\ to exit.",2,C_MUTED) end)
     makeRightSection("Keybind",0); makeRightKeybind("Toggle",ClashSettings.ClashKeybind.Name,1)
     makeButtonRow(makeCard(RightScroll,2),"Set Keybind",0,function()
-        Notify("Listening...","Press any key.",4,C_ACCENT())
+        Notify("Listening...","Press any key.",4,C_ACCENT)
         local conn; conn=UIS.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.Keyboard then
                 local kc=inp.KeyCode
@@ -2019,21 +2273,22 @@ allTabFrames["clash"] = function()
     makeRightSection("Overlay",10); makeButtonRow(makeCard(RightScroll,11),"Spawn Clash Overlay",0,function() spawnClashOverlay(); Notify("Clash Overlay","Spawned.",2,C_GREEN) end)
 end
 
-allTabFrames["camera"] = function()
+-- CAMERA
+allTabFrames["camera"]=function()
     makeSectionLabel(Content,"Broken Camera",0)
     local camCard=makeCard(Content,1)
     makeToggleRow(camCard,"Enable Broken Camera",0,false,function(val)
         CameraSettings.BrokenCamera=val
         if val then startLockOnWatcher(); if isLockedOn() then freezeCamera() end; Notify("Broken Camera ON","Key: ["..CameraSettings.LockOnKeybind.Name.."]",3,C_GREEN)
-        else stopLockOnWatcher(); Notify("Broken Camera OFF","Restored.",3,C_MUTED()) end
+        else stopLockOnWatcher(); Notify("Broken Camera OFF","Restored.",3,C_MUTED) end
     end,"Freeze camera on lock-on","brokencamera")
     makeButtonRow(camCard,"Snap Freeze Point",1,function()
         if CameraSettings.CurrentlyFrozen then CameraSettings.FrozenCFrame=Camera.CFrame; Notify("Snapped","Freeze point updated.",2,C_GREEN)
-        else Notify("Not Frozen","Lock on first.",2,C_MUTED()) end
+        else Notify("Not Frozen","Lock on first.",2,C_MUTED) end
     end)
     makeRightSection("Lock-On Key",0); makeRightKeybind("Current Key",CameraSettings.LockOnKeybind.Name,1)
     makeButtonRow(makeCard(RightScroll,2),"Set Lock-On Key",0,function()
-        Notify("Listening...","Press your lock-on key.",4,C_ACCENT())
+        Notify("Listening...","Press your lock-on key.",4,C_ACCENT)
         local conn; conn=UIS.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.Keyboard then
                 local kc=inp.KeyCode
@@ -2045,100 +2300,107 @@ allTabFrames["camera"] = function()
     end)
 end
 
-allTabFrames["afk"] = function()
+-- ANTI AFK
+allTabFrames["afk"]=function()
     makeSectionLabel(Content,"Anti AFK",0)
     local afkCard=makeCard(Content,1)
     makeToggleRow(afkCard,"Enable Anti AFK",0,false,function(val)
-        AntiAFK.Enabled=val
+        afkEnabled=val; AntiAFK.Enabled=val
         if val then startAFK(); Notify("Anti AFK ON","VirtualUser every 15s.",3,C_GREEN)
-        else stopAFK(); Notify("Anti AFK OFF","Disabled.",2,C_MUTED()) end
+        else stopAFK(); Notify("Anti AFK OFF","Disabled.",2,C_MUTED) end
     end,"Prevent Roblox idle kick every 15 seconds","antiafk")
     makeRightSection("Status",0); makeRightStatus("Idle",false,1)
     makeRightSection("Overlay",5); makeButtonRow(makeCard(RightScroll,6),"Spawn AFK Overlay",0,function() spawnAntiAFKOverlay(); Notify("AFK Overlay","Spawned.",2,C_GREEN) end)
 end
 
-allTabFrames["rejoin"] = function()
+-- AUTO REJOIN
+allTabFrames["rejoin"]=function()
     makeSectionLabel(Content,"Kick Protection",0)
     local rejCard=makeCard(Content,1)
     makeToggleRow(rejCard,"Enable Auto Rejoin",0,false,function(val)
         AutoRejoin.Enabled=val
         if val then startAutoRejoin(); Notify("Auto Rejoin ON","Method: "..AutoRejoin.Method,3,C_GREEN)
-        else stopAutoRejoin(); Notify("Auto Rejoin OFF","Disabled.",3,C_MUTED()) end
+        else stopAutoRejoin(); Notify("Auto Rejoin OFF","Disabled.",3,C_MUTED) end
     end,"Auto-rejoin when kicked","autorejoin")
     makeToggleRow(rejCard,"Load Script After Rejoin",1,true,function(val) AutoRejoin.LoadScript=val end)
     makeSectionLabel(Content,"Manual",2)
     local manCard=makeCard(Content,3)
     makeButtonRow(manCard,"Rejoin Now",0,function()
-        Notify("Rejoining...","Teleporting back.",3,C_ACCENT()); task.wait(1); doRejoin()
+        Notify("Rejoining...","Teleporting back.",3,C_ACCENT); task.wait(1); doRejoin()
     end,nil,nil,"Rejoin the server now?")
     makeSectionLabel(Content,"Info",4)
     local iCard=makeCard(Content,5); local _,lbl,div=makeFeatureRow(iCard,"Place ID: "..tostring(game.PlaceId),0)
-    lbl.TextColor3=C_MUTED(); lbl.Font=Enum.Font.Gotham; lbl.TextSize=fs(10); div:Destroy()
+    lbl.TextColor3=C_MUTED; lbl.Font=Enum.Font.Gotham; lbl.TextSize=fs(10); div:Destroy()
     makeRightSection("Method",0); makeRightDropdown("Rejoin Method",{"SameServer","NewServer"},AutoRejoin.Method,1,function(opt) AutoRejoin.Method=opt end)
     makeRightSection("Timing",5); makeRightSlider("Rejoin Delay",1,15,AutoRejoin.Delay,"s",6,function(val) AutoRejoin.Delay=val end)
     makeRightSection("Overlay",10); makeButtonRow(makeCard(RightScroll,11),"Spawn Rejoin Overlay",0,function() spawnRejoinOverlay(); Notify("Rejoin Overlay","Spawned.",2,C_GREEN) end)
 end
 
-allTabFrames["reconnect"] = function()
+-- AUTO RECONNECT
+allTabFrames["reconnect"]=function()
     makeSectionLabel(Content,"Extended Detection",0)
     local rcCard=makeCard(Content,1)
     makeToggleRow(rcCard,"Enable Auto Reconnect",0,false,function(val)
         AutoReconnect.Enabled=val
         if val then reconnectFired=false; startAutoReconnect(); Notify("Auto Reconnect ON","All detection methods active.",3,C_GREEN)
-        else stopAutoReconnect(); Notify("Auto Reconnect OFF","Disabled.",3,C_MUTED()) end
+        else stopAutoReconnect(); Notify("Auto Reconnect OFF","Disabled.",3,C_MUTED) end
     end,"Monitor all disconnect types and auto-reconnect","autoreconnect")
     makeSectionLabel(Content,"Detection Methods",2)
     local detCard=makeCard(Content,3)
     local dets={"CoreGui error/disconnect screen","PlayerRemoving event","AncestryChanged hard kicks","Heartbeat timeout watchdog (8s)"}
-    for i,txt in ipairs(dets) do
-        local _,lbl,div=makeFeatureRow(detCard,txt,i); lbl.TextColor3=C_MUTED(); lbl.Font=Enum.Font.Gotham; lbl.TextSize=fs(10)
-        if i==#dets then div:Destroy() end
-    end
+    for i,txt in ipairs(dets) do local _,lbl,div=makeFeatureRow(detCard,txt,i); lbl.TextColor3=C_MUTED; lbl.Font=Enum.Font.Gotham; lbl.TextSize=fs(10); if i==#dets then div:Destroy() end end
     makeRightSection("Timing",0); makeRightSlider("Reconnect Delay",1,15,AutoReconnect.Delay,"s",1,function(val) AutoReconnect.Delay=val end)
 end
 
-allTabFrames["train"] = function()
+-- AUTO TRAIN
+allTabFrames["train"]=function()
     makeSectionLabel(Content,"Auto Train",0)
-    makeButtonRow(makeCard(Content,1),"Launch Auto Train",0,function()
-        Notify("Loading...","Please wait.",3,C_ACCENT())
+    local trainCard=makeCard(Content,1)
+    local _,setLoading=makeButtonRow(trainCard,"Launch Auto Train",0,function()
+    end,"Load external auto training script")
+    -- Override with loading state version
+    local hitbox2=trainCard:FindFirstChildOfClass("Frame") -- get the row
+    local row2,setLoad2=makeButtonRow(makeCard(Content,2),"Launch Auto Train",0,function()
+        Notify("Loading...","Please wait.",3,C_ACCENT)
         local ok=pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/kellyjieyi37-hash/script/main/script.lua"))() end)
         if ok then Notify("Loaded","Auto Train active.",4,C_GREEN) else Notify("Failed","Check HTTP permissions.",5,C_RED) end
     end,"Load external auto training script")
 end
 
-allTabFrames["fly"] = function()
+-- FLY
+allTabFrames["fly"]=function()
     makeSectionLabel(Content,"Fly GUI V3",0)
-    makeButtonRow(makeCard(Content,1),"Launch Fly GUI",0,function()
-        Notify("Loading Fly GUI...","Please wait.",3,C_ACCENT())
+    local flyCard=makeCard(Content,1)
+    local _,setFlyLoading=makeButtonRow(flyCard,"Launch Fly GUI",0,function()
+        Notify("Loading Fly GUI...","Please wait.",3,C_ACCENT)
         local ok=pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))() end)
         if ok then FlyEnabled=true; Notify("Fly GUI Loaded","FlyGuiV3 active.",4,C_GREEN)
         else Notify("Failed","Check HTTP permissions.",5,C_RED) end
     end,"Load FlyGuiV3 by XNEOFF","fly")
 end
 
-allTabFrames["noclip"] = function()
+-- NOCLIP
+allTabFrames["noclip"]=function()
     makeSectionLabel(Content,"Walk Through Walls",0)
     local noclipCard=makeCard(Content,1)
     makeToggleRow(noclipCard,"Enable Noclip",0,NoclipSettings.Enabled,function(val)
         NoclipSettings.Enabled=val; setNoclip(val)
-        if val then Notify("Noclip ON","Collision disabled.",3,C_GREEN) else Notify("Noclip OFF","Collision restored.",2,C_MUTED()) end
+        if val then Notify("Noclip ON","Collision disabled.",3,C_GREEN) else Notify("Noclip OFF","Collision restored.",2,C_MUTED) end
     end,"Disable character collision every physics step","noclip")
     makeSectionLabel(Content,"Tips",2)
     local tipCard=makeCard(Content,3)
     local tips={"Combine with Fly for full ghost movement.","Collision restored when toggled off.","Use Fly before disabling near floors."}
-    for i,txt in ipairs(tips) do
-        local _,lbl,div=makeFeatureRow(tipCard,txt,i); lbl.TextColor3=C_MUTED(); lbl.Font=Enum.Font.Gotham; lbl.TextSize=fs(10)
-        if i==#tips then div:Destroy() end
-    end
+    for i,txt in ipairs(tips) do local _,lbl,div=makeFeatureRow(tipCard,txt,i); lbl.TextColor3=C_MUTED; lbl.Font=Enum.Font.Gotham; lbl.TextSize=fs(10); if i==#tips then div:Destroy() end end
 end
 
-allTabFrames["fps"] = function()
+-- FPS BOOST
+allTabFrames["fps"]=function()
     makeSectionLabel(Content,"Performance",0)
     local fpsCard=makeCard(Content,1)
     makeButtonRow(fpsCard,"Apply FPS Boost",0,function()
-        if FpsMod.Applied then Notify("Already Applied","Hit Undo first.",2,C_MUTED()); return end
-        Notify("Applying...","Stripping visuals.",4,C_ACCENT()); takeSnapshot(); FpsMod.Applied=true
-        pcall(function() setfpscap(999999999) end)
+        if FpsSnapshot.Applied then Notify("Already Applied","Hit Undo first.",2,C_MUTED); return end
+        Notify("Applying...","Stripping visuals.",4,C_ACCENT)
+        takeSnapshot(); FpsSnapshot.Applied=true; pcall(function() setfpscap(999999999) end)
         for _,v in next,Workspace:GetDescendants() do stripDescendant(v) end
         for _,v in next,game:GetService("Lighting"):GetDescendants() do
             pcall(function()
@@ -2147,55 +2409,61 @@ allTabFrames["fps"] = function()
         end
         pcall(function() local L=game:GetService("Lighting"); sethiddenproperty(L,"Technology",2); L.GlobalShadows=false; L.FogEnd=9e9; L.Brightness=0 end)
         pcall(function() local T2=Workspace:FindFirstChildOfClass("Terrain"); if T2 then sethiddenproperty(T2,"Decoration",false); T2.WaterReflectance=0; T2.WaterTransparency=0.7; T2.WaterWaveSize=0; T2.WaterWaveSpeed=0 end end)
-        FpsMod.DescConnection=Workspace.DescendantAdded:Connect(function(v) task.defer(function() stripDescendant(v) end) end)
+        FpsSnapshot.DescConnection=Workspace.DescendantAdded:Connect(function(v) task.defer(function() stripDescendant(v) end) end)
         Notify("FPS Boost Applied","Press Undo to restore.",4,C_GREEN)
     end,"Strip all visual effects to maximize FPS","fpsboost")
     makeButtonRow(fpsCard,"Undo FPS Boost",1,function()
-        if not FpsMod.Applied then Notify("Nothing to Undo","Apply first.",2,C_MUTED()); return end
-        if FpsMod.DescConnection then FpsMod.DescConnection:Disconnect(); FpsMod.DescConnection=nil end
-        for _,s in ipairs(FpsMod.Parts)   do pcall(function() if s.inst and s.inst.Parent then s.inst.CastShadow=s.CastShadow; s.inst.Material=s.Material; s.inst.Reflectance=s.Reflectance; s.inst.MaterialVariant=s.MaterialVariant end end) end
-        for _,s in ipairs(FpsMod.Meshes)  do pcall(function() if s.inst and s.inst.Parent then s.inst.CastShadow=s.CastShadow; s.inst.DoubleSided=s.DoubleSided; s.inst.RenderFidelity=s.RenderFidelity; s.inst.TextureID=s.TextureID end end) end
-        for _,s in ipairs(FpsMod.Decals)  do pcall(function() if s.inst and s.inst.Parent then s.inst.Transparency=s.Transparency end end) end
-        for _,s in ipairs(FpsMod.Effects) do pcall(function() if s.inst and s.inst.Parent then s.inst.Enabled=s.Enabled end end) end
-        pcall(function() local L=game:GetService("Lighting"); sethiddenproperty(L,"Technology",4); L.GlobalShadows=FpsMod.Lighting.GlobalShadows; L.FogEnd=FpsMod.Lighting.FogEnd; L.Brightness=FpsMod.Lighting.Brightness end)
-        pcall(function() local T2=Workspace:FindFirstChildOfClass("Terrain"); if T2 and FpsMod.Terrain then sethiddenproperty(T2,"Decoration",true); T2.WaterReflectance=FpsMod.Terrain.WaterReflectance; T2.WaterTransparency=FpsMod.Terrain.WaterTransparency; T2.WaterWaveSize=FpsMod.Terrain.WaterWaveSize; T2.WaterWaveSpeed=FpsMod.Terrain.WaterWaveSpeed end end)
-        FpsMod.Applied=false; Notify("FPS Boost Undone","Visuals restored.",4,C_GREEN)
+        if not FpsSnapshot.Applied then Notify("Nothing to Undo","Apply first.",2,C_MUTED); return end
+        if FpsSnapshot.DescConnection then FpsSnapshot.DescConnection:Disconnect(); FpsSnapshot.DescConnection=nil end
+        for _,s in ipairs(FpsSnapshot.Parts)   do pcall(function() if s.inst and s.inst.Parent then s.inst.CastShadow=s.CastShadow; s.inst.Material=s.Material; s.inst.Reflectance=s.Reflectance; s.inst.MaterialVariant=s.MaterialVariant end end) end
+        for _,s in ipairs(FpsSnapshot.Meshes)  do pcall(function() if s.inst and s.inst.Parent then s.inst.CastShadow=s.CastShadow; s.inst.DoubleSided=s.DoubleSided; s.inst.RenderFidelity=s.RenderFidelity; s.inst.TextureID=s.TextureID end end) end
+        for _,s in ipairs(FpsSnapshot.Decals)  do pcall(function() if s.inst and s.inst.Parent then s.inst.Transparency=s.Transparency end end) end
+        for _,s in ipairs(FpsSnapshot.Effects) do pcall(function() if s.inst and s.inst.Parent then s.inst.Enabled=s.Enabled end end) end
+        pcall(function() local L=game:GetService("Lighting"); sethiddenproperty(L,"Technology",4); L.GlobalShadows=FpsSnapshot.Lighting.GlobalShadows; L.FogEnd=FpsSnapshot.Lighting.FogEnd; L.Brightness=FpsSnapshot.Lighting.Brightness end)
+        pcall(function() local T2=Workspace:FindFirstChildOfClass("Terrain"); if T2 and FpsSnapshot.Terrain then sethiddenproperty(T2,"Decoration",true); T2.WaterReflectance=FpsSnapshot.Terrain.WaterReflectance; T2.WaterTransparency=FpsSnapshot.Terrain.WaterTransparency; T2.WaterWaveSize=FpsSnapshot.Terrain.WaterWaveSize; T2.WaterWaveSpeed=FpsSnapshot.Terrain.WaterWaveSpeed end end)
+        FpsSnapshot.Applied=false; Notify("FPS Boost Undone","Visuals restored.",4,C_GREEN)
     end,"Restore all visuals to pre-boost state")
 end
 
-allTabFrames["iy"] = function()
+-- INFINITE YIELD
+allTabFrames["iy"]=function()
     makeSectionLabel(Content,"Admin Commands",0)
-    makeButtonRow(makeCard(Content,1),"Load Infinite Yield",0,function()
-        Notify("Loading...","Please wait.",4,C_ACCENT())
+    local iyCard=makeCard(Content,1)
+    makeButtonRow(iyCard,"Load Infinite Yield",0,function()
+        Notify("Loading...","Please wait.",4,C_ACCENT)
         pcall(function() loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))() end)
     end,"Load the Infinite Yield admin command library")
 end
 
-allTabFrames["classjoin"] = function()
+-- JOIN CLASS
+do
     local CLASS_GAMES={
         {name="Class C",id=3738115442},{name="Class B",id=4574912733},
         {name="Class A",id=5161312636},{name="Class S",id=7230787006},
         {name="Trading",id=9044551174},{name="Trading (Lv 30+)",id=13440374297},
     }
-    makeSectionLabel(Content,"Select Class or Lobby",0)
-    local csCard=makeCard(Content,1)
-    for i,entry in ipairs(CLASS_GAMES) do
-        makeButtonRow(csCard,entry.name,i,function()
-            Notify("Teleporting...","Joining "..entry.name,3,C_ACCENT())
-            task.wait(1); pcall(function() TeleportService:Teleport(entry.id,Player) end)
-        end,"Teleport to "..entry.name)
+    allTabFrames["classjoin"]=function()
+        makeSectionLabel(Content,"Select Class or Lobby",0)
+        local csCard=makeCard(Content,1)
+        for i,entry in ipairs(CLASS_GAMES) do
+            makeButtonRow(csCard,entry.name,i,function()
+                Notify("Teleporting...","Joining "..entry.name,3,C_ACCENT)
+                task.wait(1); pcall(function() TeleportService:Teleport(entry.id,Player) end)
+            end,"Teleport to "..entry.name)
+        end
     end
 end
 
-allTabFrames["macro"] = function()
+-- MACRO RECORDER
+allTabFrames["macro"]=function()
     makeSectionLabel(Content,"Record & Play",0)
     local nameRow=Instance.new("Frame",Content); nameRow.Size=UDim2.new(1,0,0,36)
-    nameRow.BackgroundColor3=C_CARD(); nameRow.BorderSizePixel=0; nameRow.LayoutOrder=0
-    makeRound(nameRow,8); makeStroke(nameRow,C_STROKE(),1)
+    nameRow.BackgroundColor3=C_CARD; nameRow.BorderSizePixel=0; nameRow.LayoutOrder=0
+    makeRound(nameRow,8); makeStroke(nameRow,C_STROKE,1)
     local nameBox=Instance.new("TextBox",nameRow); nameBox.Size=UDim2.new(1,-100,1,0)
     nameBox.Position=UDim2.new(0,12,0,0); nameBox.BackgroundTransparency=1
-    nameBox.Text=""; nameBox.PlaceholderText="Macro name..."; nameBox.PlaceholderColor3=C_MUTED()
-    nameBox.TextColor3=C_TEXT(); nameBox.TextSize=fs(11); nameBox.Font=Enum.Font.GothamMedium
+    nameBox.Text=""; nameBox.PlaceholderText="Macro name..."; nameBox.PlaceholderColor3=C_MUTED
+    nameBox.TextColor3=C_TEXT; nameBox.TextSize=fs(11); nameBox.Font=Enum.Font.GothamMedium
     nameBox.TextXAlignment=Enum.TextXAlignment.Left; nameBox.ClearTextOnFocus=false
     local recBtn=Instance.new("TextButton",nameRow); recBtn.Size=UDim2.new(0,80,0,26)
     recBtn.Position=UDim2.new(1,-88,0.5,-13); recBtn.BackgroundColor3=C_RED
@@ -2205,7 +2473,8 @@ allTabFrames["macro"] = function()
     recBtn.MouseButton1Click:Connect(function()
         if not recActive then
             local name=nameBox.Text~="" and nameBox.Text or ("Macro_"..tostring(#MacroRecorder.Macros+1))
-            lastInputTime=0; startMacroRecording(name); recActive=true
+            lastInputTime=0 -- FIX: reset timer
+            startMacroRecording(name); recActive=true
             recBtn.Text="⏹ STOP"; recBtn.BackgroundColor3=C_YELLOW; Notify("Recording","Keys now recorded.",3,C_RED)
         else
             stopMacroRecording(); recActive=false; recBtn.Text="⏺ REC"; recBtn.BackgroundColor3=C_RED
@@ -2216,7 +2485,7 @@ allTabFrames["macro"] = function()
     makeSectionLabel(Content,"Saved Macros",2)
     if #MacroRecorder.Macros==0 then
         local emptyCard=makeCard(Content,3); local _,lbl,div=makeFeatureRow(emptyCard,"No macros recorded yet.",0)
-        lbl.TextColor3=C_MUTED(); lbl.Font=Enum.Font.Gotham; div:Destroy()
+        lbl.TextColor3=C_MUTED; lbl.Font=Enum.Font.Gotham; div:Destroy()
     else
         local macroList=makeCard(Content,3)
         for i,macro in ipairs(MacroRecorder.Macros) do
@@ -2247,24 +2516,37 @@ allTabFrames["macro"] = function()
     end
     makeRightSection("Status",0)
     local statCard=Instance.new("Frame",RightScroll); statCard.Size=UDim2.new(1,0,0,28)
-    statCard.BackgroundColor3=C_CARD(); statCard.BorderSizePixel=0; statCard.LayoutOrder=1
-    makeRound(statCard,6); makeStroke(statCard,C_STROKE(),1)
+    statCard.BackgroundColor3=C_CARD; statCard.BorderSizePixel=0; statCard.LayoutOrder=1
+    makeRound(statCard,6); makeStroke(statCard,C_STROKE,1)
     local statLbl=Instance.new("TextLabel",statCard); statLbl.Size=UDim2.new(1,-10,1,0)
     statLbl.Position=UDim2.new(0,10,0,0); statLbl.BackgroundTransparency=1
-    statLbl.TextColor3=C_MUTED(); statLbl.TextSize=fs(10); statLbl.Font=Enum.Font.GothamMedium; statLbl.TextXAlignment=Enum.TextXAlignment.Left
+    statLbl.TextColor3=C_MUTED; statLbl.TextSize=fs(10); statLbl.Font=Enum.Font.GothamMedium
+    statLbl.TextXAlignment=Enum.TextXAlignment.Left
     RunService.Heartbeat:Connect(function()
         if not statLbl or not statLbl.Parent then return end
         if MacroRecorder.Recording then statLbl.Text="🔴 Recording…"; statLbl.TextColor3=C_RED
         elseif MacroRecorder.Playing then statLbl.Text="🟢 Playing…"; statLbl.TextColor3=C_GREEN
-        else statLbl.Text="⚫ Idle"; statLbl.TextColor3=C_MUTED() end
+        else statLbl.Text="⚫ Idle"; statLbl.TextColor3=C_MUTED end
     end)
+    makeRightSection("Tips",5)
+    local tipCard2=Instance.new("Frame",RightScroll); tipCard2.Size=UDim2.new(1,0,0,0)
+    tipCard2.AutomaticSize=Enum.AutomaticSize.Y; tipCard2.BackgroundColor3=C_CARD
+    tipCard2.BorderSizePixel=0; tipCard2.LayoutOrder=6; makeRound(tipCard2,6); makeStroke(tipCard2,C_STROKE,1)
+    makePadding(tipCard2,6,6,10,10); makeList(tipCard2,Enum.FillDirection.Vertical,3)
+    local tips2={"Name before recording","Records key presses only","Playback uses original timing"}
+    for _,tip in ipairs(tips2) do
+        local tl=Instance.new("TextLabel",tipCard2); tl.Size=UDim2.new(1,0,0,14)
+        tl.BackgroundTransparency=1; tl.Text="• "..tip; tl.TextColor3=C_MUTED
+        tl.TextSize=fs(9); tl.Font=Enum.Font.Gotham; tl.TextXAlignment=Enum.TextXAlignment.Left
+    end
 end
 
-allTabFrames["keybinds"] = function()
+-- KEYBIND MANAGER
+allTabFrames["keybinds"]=function()
     makeSectionLabel(Content,"Active Keybinds",0)
     local kbCard=makeCard(Content,1)
     local binds={
-        {"Show/Hide UI",       function() return RayfieldKeybind.Key.Name end,         function(kc) RayfieldKeybind.Key=kc end},
+        {"Show/Hide UI",       function() return RayfieldKeybindSettings.Key.Name end, function(kc) RayfieldKeybindSettings.Key=kc end},
         {"Auto Clash Toggle",  function() return ClashSettings.ClashKeybind.Name end,  function(kc) ClashSettings.ClashKeybind=kc end},
         {"Camera Lock Toggle", function() return CameraSettings.LockOnKeybind.Name end,function(kc) CameraSettings.LockOnKeybind=kc end},
         {"Keybind Cheatsheet", function() return KeybindCheatsheetKey.Name end,         function(kc) KeybindCheatsheetKey=kc end},
@@ -2274,23 +2556,23 @@ allTabFrames["keybinds"] = function()
         lbl.Size=UDim2.new(0.5,0,1,0)
         local badge=Instance.new("TextLabel",row); badge.Size=UDim2.new(0,0,0,18)
         badge.AutomaticSize=Enum.AutomaticSize.X; badge.Position=UDim2.new(0.52,0,0.5,-9)
-        badge.BackgroundColor3=C_PANEL(); badge.TextColor3=C_ACCENT()
+        badge.BackgroundColor3=C_PANEL; badge.TextColor3=C_ACCENT
         badge.Text=" "..bind[2]().." "; badge.TextSize=fs(10)
-        badge.Font=Enum.Font.GothamBold; badge.BorderSizePixel=0; makeRound(badge,4); makeStroke(badge,C_ACCENT(),1)
+        badge.Font=Enum.Font.GothamBold; badge.BorderSizePixel=0; makeRound(badge,4); makeStroke(badge,C_ACCENT,1)
         local editBtn=Instance.new("TextButton",row); editBtn.Size=UDim2.new(0,38,0,22)
-        editBtn.Position=UDim2.new(1,-44,0.5,-11); editBtn.BackgroundColor3=C_CARD()
-        editBtn.Text="Set"; editBtn.TextColor3=C_TEXT(); editBtn.TextSize=fs(10)
-        editBtn.Font=Enum.Font.GothamBold; editBtn.BorderSizePixel=0; makeRound(editBtn,5); makeStroke(editBtn,C_STROKE(),1)
+        editBtn.Position=UDim2.new(1,-44,0.5,-11); editBtn.BackgroundColor3=C_CARD
+        editBtn.Text="Set"; editBtn.TextColor3=C_TEXT; editBtn.TextSize=fs(10)
+        editBtn.Font=Enum.Font.GothamBold; editBtn.BorderSizePixel=0; makeRound(editBtn,5); makeStroke(editBtn,C_STROKE,1)
         local bi=i
         editBtn.MouseButton1Click:Connect(function()
             editBtn.Text="…"; editBtn.TextColor3=C_YELLOW
-            Notify("Listening…","Press a key for: "..binds[bi][1],4,C_ACCENT())
+            Notify("Listening…","Press a key for: "..binds[bi][1],4,C_ACCENT)
             local conn; conn=UIS.InputBegan:Connect(function(inp)
                 if inp.UserInputType==Enum.UserInputType.Keyboard then
                     local kc=inp.KeyCode
                     if kc~=Enum.KeyCode.LeftShift and kc~=Enum.KeyCode.RightShift then
                         conn:Disconnect(); binds[bi][3](kc); badge.Text=" "..kc.Name.." "
-                        editBtn.Text="Set"; editBtn.TextColor3=C_TEXT()
+                        editBtn.Text="Set"; editBtn.TextColor3=C_TEXT
                         Notify("Updated",binds[bi][1]..": ["..kc.Name.."]",3,C_GREEN)
                     end
                 end
@@ -2299,38 +2581,44 @@ allTabFrames["keybinds"] = function()
     end
     makeRightSection("Reset All",0)
     makeButtonRow(makeCard(RightScroll,1),"Reset to Defaults",0,function()
-        RayfieldKeybind.Key=Enum.KeyCode.RightShift; ClashSettings.ClashKeybind=Enum.KeyCode.F
-        CameraSettings.LockOnKeybind=Enum.KeyCode.T; KeybindCheatsheetKey=Enum.KeyCode.K
+        RayfieldKeybindSettings.Key=Enum.KeyCode.RightShift
+        ClashSettings.ClashKeybind=Enum.KeyCode.F
+        CameraSettings.LockOnKeybind=Enum.KeyCode.T
+        KeybindCheatsheetKey=Enum.KeyCode.K
         Notify("Keybinds Reset","All restored to defaults.",3,C_GREEN)
         local tn=currentTabName; currentTabName=""; selectTab(tn)
     end,nil,nil,"Reset all keybinds to defaults?")
 end
 
-allTabFrames["notiflog"] = function()
+-- NOTIF HISTORY
+allTabFrames["notiflog"]=function()
     makeSectionLabel(Content,"Recent Notifications",0)
     if #NotifHistory==0 then
         local card=makeCard(Content,1); local _,lbl,div=makeFeatureRow(card,"No notifications yet.",0)
-        lbl.TextColor3=C_MUTED(); lbl.Font=Enum.Font.Gotham; div:Destroy(); return
+        lbl.TextColor3=C_MUTED; lbl.Font=Enum.Font.Gotham; div:Destroy(); return
     end
     for i,entry in ipairs(NotifHistory) do
         if i>50 then break end
         local card=Instance.new("Frame",Content); card.Size=UDim2.new(1,0,0,0)
-        card.AutomaticSize=Enum.AutomaticSize.Y; card.BackgroundColor3=C_CARD()
-        card.BorderSizePixel=0; card.LayoutOrder=i; makeRound(card,8); makeStroke(card,C_STROKE(),1)
+        card.AutomaticSize=Enum.AutomaticSize.Y; card.BackgroundColor3=C_CARD
+        card.BorderSizePixel=0; card.LayoutOrder=i
+        makeRound(card,8); makeStroke(card,C_STROKE,1)
         local bar=Instance.new("Frame",card); bar.Size=UDim2.new(0,3,1,-10)
-        bar.Position=UDim2.new(0,0,0,5); bar.BackgroundColor3=entry.color or C_ACCENT(); bar.BorderSizePixel=0; makeRound(bar,2)
+        bar.Position=UDim2.new(0,0,0,5); bar.BackgroundColor3=entry.color or C_ACCENT
+        bar.BorderSizePixel=0; makeRound(bar,2)
         makePadding(card,6,6,14,14); makeList(card,Enum.FillDirection.Vertical,2)
         local tRow=Instance.new("Frame",card); tRow.Size=UDim2.new(1,0,0,14); tRow.BackgroundTransparency=1
         local tl=Instance.new("UIListLayout",tRow); tl.FillDirection=Enum.FillDirection.Horizontal
         local titleLbl=Instance.new("TextLabel",tRow); titleLbl.Size=UDim2.new(0.75,0,1,0)
-        titleLbl.BackgroundTransparency=1; titleLbl.Text=entry.title; titleLbl.TextColor3=C_TEXT()
+        titleLbl.BackgroundTransparency=1; titleLbl.Text=entry.title; titleLbl.TextColor3=C_TEXT
         titleLbl.TextSize=fs(11); titleLbl.Font=Enum.Font.GothamBold; titleLbl.TextXAlignment=Enum.TextXAlignment.Left
         local timeLbl=Instance.new("TextLabel",tRow); timeLbl.Size=UDim2.new(0.25,0,1,0)
-        timeLbl.BackgroundTransparency=1; timeLbl.Text=entry.timestamp; timeLbl.TextColor3=C_MUTED()
+        timeLbl.BackgroundTransparency=1; timeLbl.Text=entry.timestamp; timeLbl.TextColor3=C_MUTED
         timeLbl.TextSize=fs(9); timeLbl.Font=Enum.Font.Gotham; timeLbl.TextXAlignment=Enum.TextXAlignment.Right
         local bodyLbl=Instance.new("TextLabel",card); bodyLbl.Size=UDim2.new(1,0,0,14)
-        bodyLbl.BackgroundTransparency=1; bodyLbl.Text=entry.content; bodyLbl.TextColor3=C_MUTED()
-        bodyLbl.TextSize=fs(10); bodyLbl.Font=Enum.Font.Gotham; bodyLbl.TextXAlignment=Enum.TextXAlignment.Left; bodyLbl.TextTruncate=Enum.TextTruncate.AtEnd
+        bodyLbl.BackgroundTransparency=1; bodyLbl.Text=entry.content; bodyLbl.TextColor3=C_MUTED
+        bodyLbl.TextSize=fs(10); bodyLbl.Font=Enum.Font.Gotham; bodyLbl.TextXAlignment=Enum.TextXAlignment.Left
+        bodyLbl.TextTruncate=Enum.TextTruncate.AtEnd
     end
     if #RecentActions>0 then
         makeSectionLabel(Content,"Recent Actions",55)
@@ -2338,18 +2626,20 @@ allTabFrames["notiflog"] = function()
         for i,entry in ipairs(RecentActions) do
             if i>20 then break end
             local _,lbl,div=makeFeatureRow(actCard,entry.timestamp.." — "..entry.label,i)
-            lbl.TextColor3=C_MUTED(); lbl.Font=Enum.Font.Gotham; lbl.TextSize=fs(10)
+            lbl.TextColor3=C_MUTED; lbl.Font=Enum.Font.Gotham; lbl.TextSize=fs(10)
             if i==math.min(20,#RecentActions) then div:Destroy() end
         end
     end
     makeRightSection("Actions",0)
     makeButtonRow(makeCard(RightScroll,1),"Clear History",0,function()
         NotifHistory={}; RecentActions={}
-        local tn=currentTabName; currentTabName=""; selectTab(tn); Notify("Cleared","History cleared.",2,C_MUTED())
+        local tn=currentTabName; currentTabName=""; selectTab(tn)
+        Notify("Cleared","History cleared.",2,C_MUTED)
     end,nil,nil,"Clear all notification history?")
 end
 
-allTabFrames["profiles"] = function()
+-- PROFILES
+allTabFrames["profiles"]=function()
     makeSectionLabel(Content,"Config Profiles",0)
     local profileCard=makeCard(Content,1)
     local function buildProfileList()
@@ -2375,7 +2665,8 @@ allTabFrames["profiles"] = function()
     end)
 end
 
-allTabFrames["settings"] = function()
+-- SETTINGS (new tab for UI / UX settings)
+allTabFrames["settings"]=function()
     makeSectionLabel(Content,"Interface",0)
     local uiCard=makeCard(Content,1)
     makeToggleRow(uiCard,"Dim Background When Open",0,UISettings.DimOverlay,function(val) setDimOverlay(val) end,"Darken the game behind the GUI")
@@ -2385,89 +2676,127 @@ allTabFrames["settings"] = function()
         for _,entry in ipairs(allSideItems) do entry.lbl.Visible=not val end
         SIDEBAR_W=val and 52 or 160; Sidebar.Size=UDim2.new(0,SIDEBAR_W,1,0)
     end,"Collapse sidebar to icon-only mode")
+
     makeSectionLabel(Content,"Font Size",2)
     local fontCard=makeCard(Content,3)
+    -- Font size toggle buttons (Small / Medium / Large)
     local fontRow=Instance.new("Frame",fontCard); fontRow.Size=UDim2.new(1,0,0,36)
-    fontRow.BackgroundTransparency=1; fontRow.BorderSizePixel=0; fontRow.LayoutOrder=0; makePadding(fontRow,0,0,10,10)
-    local fontBtnList=Instance.new("UIListLayout",fontRow); fontBtnList.FillDirection=Enum.FillDirection.Horizontal
-    fontBtnList.HorizontalAlignment=Enum.HorizontalAlignment.Left; fontBtnList.VerticalAlignment=Enum.VerticalAlignment.Center; fontBtnList.Padding=UDim.new(0,6)
-    local fontModes={"Small","Medium","Large"}; local fontBtns={}
+    fontRow.BackgroundTransparency=1; fontRow.BorderSizePixel=0; fontRow.LayoutOrder=0
+    makePadding(fontRow,0,0,10,10)
+    local fontBtnList=Instance.new("UIListLayout",fontRow)
+    fontBtnList.FillDirection=Enum.FillDirection.Horizontal
+    fontBtnList.HorizontalAlignment=Enum.HorizontalAlignment.Left
+    fontBtnList.VerticalAlignment=Enum.VerticalAlignment.Center
+    fontBtnList.Padding=UDim.new(0,6)
+    local fontModes={"Small","Medium","Large"}
+    local fontBtns={}
     local function refreshFontBtns()
         for _,b in ipairs(fontBtns) do
             local isActive=(b.Text==UISettings.FontSizeMode)
-            b.BackgroundColor3=isActive and C_ACCENT() or C_CARD(); b.TextColor3=isActive and Color3.fromRGB(255,255,255) or C_MUTED()
+            b.BackgroundColor3=isActive and C_ACCENT or C_CARD
+            b.TextColor3=isActive and Color3.fromRGB(255,255,255) or C_MUTED
         end
     end
     for _,mode in ipairs(fontModes) do
         local btn=Instance.new("TextButton",fontRow); btn.Size=UDim2.new(0,64,0,26)
-        btn.BackgroundColor3=mode==UISettings.FontSizeMode and C_ACCENT() or C_CARD()
-        btn.Text=mode; btn.TextColor3=mode==UISettings.FontSizeMode and Color3.fromRGB(255,255,255) or C_MUTED()
-        btn.TextSize=fs(10); btn.Font=Enum.Font.GothamBold; btn.BorderSizePixel=0; makeRound(btn,6); makeStroke(btn,C_STROKE(),1)
+        btn.BackgroundColor3=mode==UISettings.FontSizeMode and C_ACCENT or C_CARD
+        btn.Text=mode; btn.TextColor3=mode==UISettings.FontSizeMode and Color3.fromRGB(255,255,255) or C_MUTED
+        btn.TextSize=fs(10); btn.Font=Enum.Font.GothamBold; btn.BorderSizePixel=0; makeRound(btn,6)
+        makeStroke(btn,C_STROKE,1)
         table.insert(fontBtns,btn)
-        btn.MouseButton1Click:Connect(function() UISettings.FontSizeMode=mode; refreshFontBtns(); Notify("Font Size","Set to "..mode,2,C_ACCENT()) end)
+        btn.MouseButton1Click:Connect(function()
+            UISettings.FontSizeMode=mode; refreshFontBtns()
+            Notify("Font Size","Set to "..mode,2,C_ACCENT)
+        end)
     end
+
     makeSectionLabel(Content,"Toast Position",4)
     local toastCard=makeCard(Content,5)
     local toastRow=Instance.new("Frame",toastCard); toastRow.Size=UDim2.new(1,0,0,36)
-    toastRow.BackgroundTransparency=1; toastRow.BorderSizePixel=0; toastRow.LayoutOrder=0; makePadding(toastRow,0,0,10,10)
-    local toastBtnList=Instance.new("UIListLayout",toastRow); toastBtnList.FillDirection=Enum.FillDirection.Horizontal
-    toastBtnList.HorizontalAlignment=Enum.HorizontalAlignment.Left; toastBtnList.VerticalAlignment=Enum.VerticalAlignment.Center; toastBtnList.Padding=UDim.new(0,4)
-    local toastPositions={"TopRight","BottomRight","BottomLeft"}; local toastBtns={}
+    toastRow.BackgroundTransparency=1; toastRow.BorderSizePixel=0; toastRow.LayoutOrder=0
+    makePadding(toastRow,0,0,10,10)
+    local toastBtnList=Instance.new("UIListLayout",toastRow)
+    toastBtnList.FillDirection=Enum.FillDirection.Horizontal
+    toastBtnList.HorizontalAlignment=Enum.HorizontalAlignment.Left
+    toastBtnList.VerticalAlignment=Enum.VerticalAlignment.Center
+    toastBtnList.Padding=UDim.new(0,4)
+    local toastPositions={"TopRight","BottomRight","BottomLeft"}
+    local toastBtns={}
     local function refreshToastBtns()
         for _,b in ipairs(toastBtns) do
             local isActive=(b.Text==UISettings.ToastPosition)
-            b.BackgroundColor3=isActive and C_ACCENT() or C_CARD(); b.TextColor3=isActive and Color3.fromRGB(255,255,255) or C_MUTED()
+            b.BackgroundColor3=isActive and C_ACCENT or C_CARD
+            b.TextColor3=isActive and Color3.fromRGB(255,255,255) or C_MUTED
         end
     end
     for _,pos in ipairs(toastPositions) do
         local btn=Instance.new("TextButton",toastRow); btn.Size=UDim2.new(0,80,0,26)
-        btn.BackgroundColor3=pos==UISettings.ToastPosition and C_ACCENT() or C_CARD()
-        btn.Text=pos; btn.TextColor3=pos==UISettings.ToastPosition and Color3.fromRGB(255,255,255) or C_MUTED()
-        btn.TextSize=fs(9); btn.Font=Enum.Font.GothamBold; btn.BorderSizePixel=0; makeRound(btn,6); makeStroke(btn,C_STROKE(),1)
-        table.insert(toastBtns,btn)
-        btn.MouseButton1Click:Connect(function() UISettings.ToastPosition=pos; refreshToastBtns(); applyToastPosition(); Notify("Toast Position","Set to "..pos,2,C_ACCENT()) end)
+        btn.BackgroundColor3=pos==UISettings.ToastPosition and C_ACCENT or C_CARD
+        btn.Text=pos; btn.TextColor3=pos==UISettings.ToastPosition and Color3.fromRGB(255,255,255) or C_MUTED
+        btn.TextSize=fs(9); btn.Font=Enum.Font.GothamBold; btn.BorderSizePixel=0; makeRound(btn,6)
+        makeStroke(btn,C_STROKE,1); table.insert(toastBtns,btn)
+        btn.MouseButton1Click:Connect(function()
+            UISettings.ToastPosition=pos; refreshToastBtns(); applyToastPosition()
+            Notify("Toast Position","Set to "..pos,2,C_ACCENT)
+        end)
     end
+
     makeSectionLabel(Content,"Config Export / Import",6)
     local cfgCard=makeCard(Content,7)
     makeButtonRow(cfgCard,"Export Config to Clipboard",0,function()
-        local json=serializeConfig(); pcall(function() setclipboard(json) end)
-        Notify("Config Exported","Copied to clipboard!",4,C_GREEN); logAction("Config exported")
+        local json=serializeConfig()
+        pcall(function() setclipboard(json) end)
+        Notify("Config Exported","Copied to clipboard!",4,C_GREEN)
+        logAction("Config exported")
     end,"Serialize all settings to JSON and copy to clipboard")
+
+    -- Import config text box
     local importRow=Instance.new("Frame",cfgCard); importRow.Size=UDim2.new(1,0,0,36)
     importRow.BackgroundTransparency=1; importRow.BorderSizePixel=0; importRow.LayoutOrder=1
     local importBox=Instance.new("TextBox",importRow); importBox.Size=UDim2.new(1,-80,1,0)
-    importBox.Position=UDim2.new(0,12,0,6); importBox.BackgroundColor3=C_PANEL(); importBox.BorderSizePixel=0
-    importBox.Text=""; importBox.PlaceholderText="Paste config JSON..."; importBox.PlaceholderColor3=C_MUTED()
-    importBox.TextColor3=C_TEXT(); importBox.TextSize=fs(10); importBox.Font=Enum.Font.Gotham
+    importBox.Position=UDim2.new(0,12,0,6)
+    importBox.BackgroundColor3=C_PANEL; importBox.BorderSizePixel=0
+    importBox.Text=""; importBox.PlaceholderText="Paste config JSON..."; importBox.PlaceholderColor3=C_MUTED
+    importBox.TextColor3=C_TEXT; importBox.TextSize=fs(10); importBox.Font=Enum.Font.Gotham
     importBox.TextXAlignment=Enum.TextXAlignment.Left; importBox.ClearTextOnFocus=false
-    makeRound(importBox,6); makeStroke(importBox,C_STROKE(),1); makePadding(importBox,0,0,6,6)
+    makeRound(importBox,6); makeStroke(importBox,C_STROKE,1); makePadding(importBox,0,0,6,6)
     local importBtn=Instance.new("TextButton",importRow); importBtn.Size=UDim2.new(0,58,0,26)
-    importBtn.Position=UDim2.new(1,-68,0.5,-13); importBtn.BackgroundColor3=C_ACCENT(); importBtn.Text="Import"
+    importBtn.Position=UDim2.new(1,-68,0.5,-13)
+    importBtn.BackgroundColor3=C_ACCENT; importBtn.Text="Import"
     importBtn.TextColor3=Color3.fromRGB(255,255,255); importBtn.TextSize=fs(10)
     importBtn.Font=Enum.Font.GothamBold; importBtn.BorderSizePixel=0; makeRound(importBtn,6)
     importBtn.MouseButton1Click:Connect(function()
         if importBox.Text=="" then Notify("Empty","Paste a config string first.",3,C_RED); return end
         local ok=deserializeConfig(importBox.Text)
-        if ok then fullRefreshTheme(); Notify("Config Imported","Settings applied!",4,C_GREEN)
+        if ok then
+            fullRefreshTheme()
+            Notify("Config Imported","Settings applied!",4,C_GREEN)
             local tn=currentTabName; currentTabName=""; selectTab(tn)
-        else Notify("Import Failed","Invalid config string.",4,C_RED) end
+        else
+            Notify("Import Failed","Invalid config string.",4,C_RED)
+        end
     end)
+
     makeRightSection("Current Theme",0); makeRightStatus(CurrentThemeName,true,1)
     makeRightSection("Active Count",5)
     local acCard=Instance.new("Frame",RightScroll); acCard.Size=UDim2.new(1,0,0,28)
-    acCard.BackgroundColor3=C_CARD(); acCard.BorderSizePixel=0; acCard.LayoutOrder=6; makeRound(acCard,6); makeStroke(acCard,C_STROKE(),1)
+    acCard.BackgroundColor3=C_CARD; acCard.BorderSizePixel=0; acCard.LayoutOrder=6
+    makeRound(acCard,6); makeStroke(acCard,C_STROKE,1)
     local acLbl=Instance.new("TextLabel",acCard); acLbl.Size=UDim2.new(1,-10,1,0)
     acLbl.Position=UDim2.new(0,10,0,0); acLbl.BackgroundTransparency=1
-    acLbl.TextColor3=C_TEXT(); acLbl.TextSize=fs(10); acLbl.Font=Enum.Font.GothamBold; acLbl.TextXAlignment=Enum.TextXAlignment.Left
+    acLbl.TextColor3=C_TEXT; acLbl.TextSize=fs(10); acLbl.Font=Enum.Font.GothamBold
+    acLbl.TextXAlignment=Enum.TextXAlignment.Left
     RunService.Heartbeat:Connect(function()
         if acLbl and acLbl.Parent then
-            local n=getActiveCount(); acLbl.Text=n.." feature"..(n==1 and "" or "s").." active"
-            acLbl.TextColor3=n>0 and C_GREEN or C_MUTED()
+            local n=getActiveCount()
+            acLbl.Text=n.." feature"..(n==1 and "" or "s").." active"
+            acLbl.TextColor3=n>0 and C_GREEN or C_MUTED
         end
     end)
 end
 
-allTabFrames["theme"] = function()
+-- THEME
+allTabFrames["theme"]=function()
     makeSectionLabel(Content,"Color Theme",0)
     local themeCard=makeCard(Content,1)
     local themeOrder={"Rebellion Dark","Dark Blue","Midnight","Obsidian","Carbon","Ash","Charcoal","Slate","Frost","Emerald","Ghost","Clear","High Contrast","Deuteranopia","Tritanopia"}
@@ -2476,6 +2805,7 @@ allTabFrames["theme"] = function()
         local row,lbl,div=makeFeatureRow(themeCard,name,i); if i==#themeOrder then div:Destroy() end
         local swatch=Instance.new("Frame",row); swatch.Size=UDim2.new(0,12,0,12)
         swatch.Position=UDim2.new(1,-50,0.5,-6); swatch.BackgroundColor3=th.Accent; swatch.BorderSizePixel=0; makeRound(swatch,6)
+        -- Low contrast warning badge
         if LowContrastThemes[name] then
             local warn=Instance.new("TextLabel",row); warn.Size=UDim2.new(0,16,0,14)
             warn.Position=UDim2.new(1,-68,0.5,-7); warn.BackgroundColor3=Color3.fromRGB(180,130,0)
@@ -2490,20 +2820,21 @@ allTabFrames["theme"] = function()
         local hitbox=Instance.new("TextButton",row); hitbox.Size=UDim2.new(1,0,1,0)
         hitbox.BackgroundTransparency=1; hitbox.Text=""; hitbox.ZIndex=2
         hitbox.MouseButton1Click:Connect(function()
-            applyTheme(name); fullRefreshTheme(); Notify("Theme Changed",name,3,C_ACCENT())
+            applyTheme(name); fullRefreshTheme(); Notify("Theme Changed",name,3,C_ACCENT)
             local tab=currentTabName; currentTabName=""; selectTab(tab)
         end)
     end
     makeRightSection("Current Theme",0); makeRightStatus(CurrentThemeName,true,1)
     makeRightSection("Accent Preview",5)
     local pCard=Instance.new("Frame",RightScroll); pCard.Size=UDim2.new(1,0,0,30)
-    pCard.BackgroundColor3=C_ACCENT(); pCard.BorderSizePixel=0; pCard.LayoutOrder=6; makeRound(pCard,6)
+    pCard.BackgroundColor3=C_ACCENT; pCard.BorderSizePixel=0; pCard.LayoutOrder=6; makeRound(pCard,6)
     local pLbl=Instance.new("TextLabel",pCard); pLbl.Size=UDim2.new(1,0,1,0)
     pLbl.BackgroundTransparency=1; pLbl.Text="Accent Color"; pLbl.TextColor3=Color3.fromRGB(255,255,255)
     pLbl.TextSize=fs(11); pLbl.Font=Enum.Font.GothamBold
 end
 
-allTabFrames["overlay"] = function()
+-- OVERLAY
+allTabFrames["overlay"]=function()
     makeSectionLabel(Content,"Live Status",0)
     local statusCard=makeCard(Content,1)
     local statuses={
@@ -2519,38 +2850,42 @@ allTabFrames["overlay"] = function()
     end
     makeSectionLabel(Content,"External Overlays",2)
     local ovCard=makeCard(Content,3)
-    makeButtonRow(ovCard,"Spawn Session Overlay",0,function() spawnSessionOverlay(); Notify("Session Overlay","Spawned.",2,C_ACCENT()) end)
+    makeButtonRow(ovCard,"Spawn Session Overlay",0,function() spawnSessionOverlay(); Notify("Session Overlay","Spawned.",2,C_ACCENT) end)
     makeButtonRow(ovCard,"Spawn Dex Farm Overlay",1,function() spawnDexOverlay(); Notify("Dex Overlay","Spawned.",2,C_GREEN) end)
-    makeButtonRow(ovCard,"Spawn Clash Overlay",2,function() spawnClashOverlay(); Notify("Clash Overlay","Spawned.",2,C_ACCENT()) end)
+    makeButtonRow(ovCard,"Spawn Clash Overlay",2,function() spawnClashOverlay(); Notify("Clash Overlay","Spawned.",2,C_ACCENT) end)
     makeButtonRow(ovCard,"Spawn Anti AFK Overlay",3,function() spawnAntiAFKOverlay(); Notify("AFK Overlay","Spawned.",2,C_GREEN) end)
     makeButtonRow(ovCard,"Spawn Rejoin Overlay",4,function() spawnRejoinOverlay(); Notify("Rejoin Overlay","Spawned.",2,C_YELLOW) end)
     makeButtonRow(ovCard,"Close All Overlays",5,function()
         for _,e in ipairs(ExternalOverlays) do pcall(function() e.gui:Destroy() end) end
         ExternalOverlays={}; Notify("Closed","All overlays removed.",2,C_RED)
     end,nil,nil,"Close all external overlay windows?")
-    makeRightSection("UI Toggle Key",0); makeRightKeybind("Show/Hide",RayfieldKeybind.Key.Name,1)
+    makeRightSection("UI Toggle Key",0); makeRightKeybind("Show/Hide",RayfieldKeybindSettings.Key.Name,1)
     makeRightSection("Session",5)
-    local stCard=Instance.new("Frame",RightScroll); stCard.Size=UDim2.new(1,0,0,28); stCard.BackgroundColor3=C_CARD()
-    stCard.BorderSizePixel=0; stCard.LayoutOrder=6; makeRound(stCard,6); makeStroke(stCard,C_STROKE(),1)
+    local stCard=Instance.new("Frame",RightScroll); stCard.Size=UDim2.new(1,0,0,28); stCard.BackgroundColor3=C_CARD
+    stCard.BorderSizePixel=0; stCard.LayoutOrder=6; makeRound(stCard,6); makeStroke(stCard,C_STROKE,1)
     local stLbl=Instance.new("TextLabel",stCard); stLbl.Size=UDim2.new(1,-10,1,0); stLbl.Position=UDim2.new(0,10,0,0)
-    stLbl.BackgroundTransparency=1; stLbl.Text="⏱ "..getSessionTime(); stLbl.TextColor3=C_MUTED()
+    stLbl.BackgroundTransparency=1; stLbl.Text="⏱ "..getSessionTime(); stLbl.TextColor3=C_MUTED
     stLbl.TextSize=fs(10); stLbl.Font=Enum.Font.GothamMedium; stLbl.TextXAlignment=Enum.TextXAlignment.Left
     RunService.Heartbeat:Connect(function() if stLbl and stLbl.Parent then stLbl.Text="⏱ "..getSessionTime() end end)
 end
 
-allTabFrames["credits"] = function()
+-- CREDITS
+allTabFrames["credits"]=function()
     makeSectionLabel(Content,"Developer",0)
     local devCard=Instance.new("Frame",Content); devCard.Size=UDim2.new(1,0,0,0)
-    devCard.AutomaticSize=Enum.AutomaticSize.Y; devCard.BackgroundColor3=C_CARD()
+    devCard.AutomaticSize=Enum.AutomaticSize.Y; devCard.BackgroundColor3=C_CARD
     devCard.BorderSizePixel=0; devCard.LayoutOrder=1
-    makeRound(devCard,8); makeStroke(devCard,C_STROKE(),1); makePadding(devCard,12,12,14,14); makeList(devCard,Enum.FillDirection.Vertical,4)
+    makeRound(devCard,8); makeStroke(devCard,C_STROKE,1); makePadding(devCard,12,12,14,14)
+    makeList(devCard,Enum.FillDirection.Vertical,4)
     local dt=Instance.new("TextLabel",devCard); dt.Size=UDim2.new(1,0,0,20); dt.BackgroundTransparency=1
-    dt.Text="By Zebra"; dt.TextColor3=C_TEXT(); dt.TextSize=fs(14); dt.Font=Enum.Font.GothamBlack; dt.TextXAlignment=Enum.TextXAlignment.Left
+    dt.Text="By Zebra"; dt.TextColor3=C_TEXT; dt.TextSize=fs(14); dt.Font=Enum.Font.GothamBlack; dt.TextXAlignment=Enum.TextXAlignment.Left
     local dd=Instance.new("TextLabel",devCard); dd.Size=UDim2.new(1,0,0,0); dd.AutomaticSize=Enum.AutomaticSize.Y
     dd.BackgroundTransparency=1; dd.Text="All features designed, written and maintained by Zebra. Thanks for using Boxing League!"
-    dd.TextColor3=C_MUTED(); dd.TextSize=fs(11); dd.Font=Enum.Font.Gotham; dd.TextXAlignment=Enum.TextXAlignment.Left; dd.TextWrapped=true
+    dd.TextColor3=C_MUTED; dd.TextSize=fs(11); dd.Font=Enum.Font.Gotham; dd.TextXAlignment=Enum.TextXAlignment.Left; dd.TextWrapped=true
+
     makeSectionLabel(Content,"All Features",2)
-    local featBody=makeCollapsibleCard(Content,"Feature List (click to expand/collapse)",3,false)
+    -- Collapsible feature list
+    local featBody,featWrapper=makeCollapsibleCard(Content,"Feature List (click to expand/collapse)",3,false)
     local features={
         {"Dex Training","Custom Dex Farm. Reads orange target, auto-punches."},
         {"Auto Clash","Clicks all clash buttons until green, exits navigation."},
@@ -2562,7 +2897,7 @@ allTabFrames["credits"] = function()
         {"Noclip","Disables collision every physics tick. Fully reversible."},
         {"Boost FPS","Strips all visuals. Fully undoable with snapshot."},
         {"Join Class","Teleport to Class C/B/A/S, Trading, Trading Lv30+."},
-        {"Macro Recorder","Record key sequences and replay with original timing."},
+        {"Macro Recorder","Record key sequences and replay with original timing. (Fixed timing)"},
         {"Favorites Tab","Star any feature to pin it in the sidebar."},
         {"Keybind Manager","View, edit and reset all keybinds in one place."},
         {"Notif History","Last 50 notifications + recent actions log."},
@@ -2580,24 +2915,39 @@ allTabFrames["credits"] = function()
         {"Bag Highlight","SelectionBox outline on the active bag."},
         {"Status Bar","Bottom strip with green/red dots for each active feature."},
         {"Active Count Badge","Shows how many features are running in the topbar."},
-        {"Config Export/Import","Serialize all settings to JSON."},
+        {"Clock","Real local time shown in the topbar."},
+        {"Tabbed Right Panel","Status and Quick tabs in the right panel."},
+        {"Quick Toggles","Fast pill-switches in the right panel Quick tab."},
+        {"Progress Bar","Visual fill bar under dex grind status."},
+        {"Collapsible Cards","Click card headers to expand/collapse sections."},
+        {"Config Export/Import","Serialize all settings to JSON and share with others."},
+        {"Font Size Toggle","Small / Medium / Large quick buttons."},
+        {"Toast Position","Choose top-right, bottom-right, or bottom-left toasts."},
+        {"Tab Badges","Red dot on sidebar items when attention needed."},
+        {"Keyboard Navigation","Arrow keys to move between sidebar tabs."},
+        {"Low Contrast Warning","⚠ badge on themes with poor readability."},
+        {"Number Input Fields","Type delay values directly next to sliders."},
     }
     for i,feat in ipairs(features) do
         local row=Instance.new("Frame",featBody); row.Size=UDim2.new(1,0,0,0)
         row.AutomaticSize=Enum.AutomaticSize.Y; row.BackgroundTransparency=1
-        row.BorderSizePixel=0; row.LayoutOrder=i; makePadding(row,6,6,12,12); makeList(row,Enum.FillDirection.Vertical,2)
+        row.BorderSizePixel=0; row.LayoutOrder=i; makePadding(row,6,6,12,12)
+        makeList(row,Enum.FillDirection.Vertical,2)
         local nameL=Instance.new("TextLabel",row); nameL.Size=UDim2.new(1,0,0,14)
-        nameL.BackgroundTransparency=1; nameL.Text=feat[1]; nameL.TextColor3=C_TEXT()
+        nameL.BackgroundTransparency=1; nameL.Text=feat[1]; nameL.TextColor3=C_TEXT
         nameL.TextSize=fs(11); nameL.Font=Enum.Font.GothamBold; nameL.TextXAlignment=Enum.TextXAlignment.Left
         local descL=Instance.new("TextLabel",row); descL.Size=UDim2.new(1,0,0,0)
         descL.AutomaticSize=Enum.AutomaticSize.Y; descL.BackgroundTransparency=1
-        descL.Text=feat[2]; descL.TextColor3=C_MUTED(); descL.TextSize=fs(10)
+        descL.Text=feat[2]; descL.TextColor3=C_MUTED; descL.TextSize=fs(10)
         descL.Font=Enum.Font.Gotham; descL.TextXAlignment=Enum.TextXAlignment.Left; descL.TextWrapped=true
     end
 end
 
+end -- end buildTabs()
+buildTabs()
+
 -- =============================================
---// ONBOARDING SPLASH
+--// ONBOARDING SPLASH \\--
 -- =============================================
 do
     local splashFlag=false
@@ -2607,18 +2957,20 @@ do
     end)
     if not splashFlag and UISettings.ShowOnboarding then
         local SplashGui=Instance.new("ScreenGui"); SplashGui.Name="BLSplash"
-        SplashGui.ResetOnSpawn=false; SplashGui.DisplayOrder=1010; SplashGui.IgnoreGuiInset=true; SplashGui.Parent=playerGui
+        SplashGui.ResetOnSpawn=false; SplashGui.DisplayOrder=1010
+        SplashGui.IgnoreGuiInset=true; SplashGui.Parent=playerGui
         local ov=Instance.new("Frame",SplashGui); ov.Size=UDim2.new(1,0,1,0)
         ov.BackgroundColor3=Color3.fromRGB(0,0,0); ov.BackgroundTransparency=0.4; ov.BorderSizePixel=0
         local card=Instance.new("Frame",SplashGui); card.Size=UDim2.new(0,340,0,0)
         card.AutomaticSize=Enum.AutomaticSize.Y; card.Position=UDim2.new(0.5,-170,0.5,-120)
-        card.BackgroundColor3=C_PANEL(); card.BorderSizePixel=0
-        makeRound(card,12); makeStroke(card,C_ACCENT(),1.5); makePadding(card,20,20,22,22); makeList(card,Enum.FillDirection.Vertical,8)
+        card.BackgroundColor3=C_PANEL; card.BorderSizePixel=0
+        makeRound(card,12); makeStroke(card,C_ACCENT,1.5); makePadding(card,20,20,22,22)
+        makeList(card,Enum.FillDirection.Vertical,8)
         local h1=Instance.new("TextLabel",card); h1.Size=UDim2.new(1,0,0,24); h1.BackgroundTransparency=1
-        h1.Text="🥊 Welcome to Boxing League"; h1.TextColor3=C_TEXT(); h1.TextSize=fs(14)
+        h1.Text="🥊 Welcome to Boxing League"; h1.TextColor3=C_TEXT; h1.TextSize=fs(14)
         h1.Font=Enum.Font.GothamBlack; h1.TextXAlignment=Enum.TextXAlignment.Left; h1.TextWrapped=true
         local tips={
-            "Press ["..RayfieldKeybind.Key.Name.."] to show/hide the GUI at any time.",
+            "Press ["..RayfieldKeybindSettings.Key.Name.."] to show/hide the GUI at any time.",
             "Use the Favorites tab to pin features you use most.",
             "Hold [K] to show a keybind cheatsheet overlay.",
             "Drag any edge or corner of the window to resize.",
@@ -2628,11 +2980,11 @@ do
         for _,tip in ipairs(tips) do
             local tl=Instance.new("TextLabel",card); tl.Size=UDim2.new(1,0,0,0)
             tl.AutomaticSize=Enum.AutomaticSize.Y; tl.BackgroundTransparency=1
-            tl.Text="• "..tip; tl.TextColor3=C_MUTED(); tl.TextSize=fs(11)
+            tl.Text="• "..tip; tl.TextColor3=C_MUTED; tl.TextSize=fs(11)
             tl.Font=Enum.Font.Gotham; tl.TextXAlignment=Enum.TextXAlignment.Left; tl.TextWrapped=true
         end
         local closeOnboard=Instance.new("TextButton",card); closeOnboard.Size=UDim2.new(1,0,0,34)
-        closeOnboard.BackgroundColor3=C_ACCENT(); closeOnboard.Text="Got it — Let's Go!"
+        closeOnboard.BackgroundColor3=C_ACCENT; closeOnboard.Text="Got it — Let's Go!"
         closeOnboard.TextColor3=Color3.fromRGB(255,255,255); closeOnboard.TextSize=fs(12)
         closeOnboard.Font=Enum.Font.GothamBold; closeOnboard.BorderSizePixel=0; makeRound(closeOnboard,8)
         closeOnboard.MouseButton1Click:Connect(function()
@@ -2645,7 +2997,7 @@ do
 end
 
 -- =============================================
---// CLEANUP
+--// CLEANUP \\--
 -- =============================================
 Player.CharacterRemoving:Connect(function()
     stopAutoClash()
@@ -2655,7 +3007,7 @@ Player.CharacterRemoving:Connect(function()
 end)
 
 -- =============================================
---// BOOT
+--// BOOT \\--
 -- =============================================
 selectTab("dex")
-Notify("Boxing League Loaded","By Zebra — "..RayfieldKeybind.Key.Name.." to hide/show",5,C_ACCENT())
+Notify("Boxing League Loaded","By Zebra — "..RayfieldKeybindSettings.Key.Name.." to hide/show",5,C_ACCENT)
